@@ -1,10 +1,10 @@
 /*
  * Fist cut at the Nbody simple naive algorithm with zero
  * optimizations at all. This will serve as our absolute 
- * baseline.
+ * baseline. We will need to look at units to make sure that all
+ * units align well. I suggest using metric.
  *
  * */
-
 
 #include <stdio.h>
 #include <math.h>
@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <errno.h>
 
-// First we need to write up a skeleton algorithm
 
 #define G             6.67384E-11
 #define TIME_STEP     0.500           //  0.5 second time increments
@@ -31,10 +30,15 @@ typedef struct forceVec {     // stuct to hold vector data on total Force exerte
   float v_vec;
 }Force;
 
-int initBodies(float* bodies, int Num)
+inline float distance(Body* body1, Body* body2)
+{
+  return (float) sqrt((body1->x_pos-body2->x_pos)*(body1->x_pos-body2->x_pos) + 
+        (body1->y_pos-body2->y_pos)*(body1->y_pos-body2->y_pos));
+}
+int initBodies(Body* bodies, int Num)
 {
   // Initialize all of the bodies
-  
+
 }
 
 float fRand(float max, float min, int seed)     // need to iterate over seed key or else same result
@@ -51,9 +55,22 @@ float fRand(float max, float min, int seed)     // need to iterate over seed key
  *  it's field. Therefore, the above will be nevative in practice.
  * 
  * */
+/*
+Force calcForce(Body* body1, Body* body2)
+{
+  float distance = distance(body1,body2);
+}
 
-// -> is shorthand for (*foo).x=46;
-
+int calcTotalForce(Body* bodyArr,int bodyNum, int totalNum)
+{
+  int i,j;
+  Force totalForce;
+  for(i=0;i<totalNum;i++)
+  {
+    totalForce += calcForce(Body* body,Body otherBody);     // need to declare this
+  }
+}
+*/
 int updateBody(Body* pointForce,Force* totalForce)
 {
   // recalculate the velocity vectors
@@ -70,7 +87,7 @@ int updateBody(Body* pointForce,Force* totalForce)
 
 int main()
 {
-  Body bod;
+  Body bod,bd;
   float x,y,u,v,r,q;
   u = 10;
   v = 9;
@@ -80,6 +97,11 @@ int main()
   bod.y_pos = y;
   bod.u_vec = u;
   bod.v_vec = v;
+  
+  bd.x_pos = 8;
+  bd.y_pos = 3;
+  bd.u_vec = 3;
+  bd.v_vec = 2;
 
   printf("%f %f %f %f \n", bod.u_vec, bod.v_vec, bod.x_pos ,bod.y_pos);
 
@@ -87,11 +109,13 @@ int main()
   fc.u_vec = 7;
   fc.v_vec = 5;
 
+  float dis = distance(&bod, &bd);
+
   int err = updateBody(&bod,&fc);
   if(err)
-     printf("%d\n", err);
-  
-  printf("%f %f %f %f \n", bod.u_vec, bod.v_vec, bod.x_pos ,bod.y_pos);
+    printf("%d\n", err);
+
+  printf("%f %f %f %f %f\n", bod.u_vec, bod.v_vec, bod.x_pos ,bod.y_pos, dis);
   return 0;
 }
 
