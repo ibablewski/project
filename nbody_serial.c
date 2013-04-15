@@ -15,12 +15,13 @@
 
 #define G             6.67384E-11
 #define PI            3.14159265
-#define TIME_STEP     0.500           //  0.5 second time increments
+#define TIME_STEP     0.001           //  0.001 second time increments
+#define N_BODY_NUM    100
 
 typedef float data_t;
 
 typedef struct body {
-  const data_t mass;    // constant mass
+  data_t mass;    // constant mass
   data_t x_pos;     // x-position in solution space
   data_t y_pos;     // y-position in solution space
   data_t u_vec;     // u-vecor = velocity vector in the x direction
@@ -38,16 +39,29 @@ inline data_t distance(Body* body1, Body* body2)
   return (data_t) sqrt((body1->x_pos-body2->x_pos)*(body1->x_pos-body2->x_pos) + 
       (body1->y_pos-body2->y_pos)*(body1->y_pos-body2->y_pos));
 }
+
+data_t fRand(float,float,int);
+
 int initBodies(Body* bodies, int Num)
 {
   // Initialize all of the bodies
+  int i,mult=12827467;
+  for(i=0; i< Num; i++)
+  {
+    bodies[i].mass = fRand(100000.0,-100000.0,i);
+    bodies[i].x_pos = fRand(10,-10,i+mult);
+    bodies[i].y_pos = fRand(10,-10,i+2*mult);
+    bodies[i].u_vec = fRand(10,-10,i+3*mult);
+    bodies[i].v_vec = fRand(10,-10,i+4*mult);
+    mult+=81722171%192323820820392;
+  }
 
 }
 
-data_t fRand(data_t max, data_t min, int seed)     // need to iterate over seed key or else same result
+data_t fRand(float max, float min, int seed)     // need to iterate over seed key or else same result
 {
   srand(seed);
-  return min + ((rand()/RAND_MAX)*(max-min));
+  return (data_t) (min + ((float)(rand()/(float)RAND_MAX)*(float)(max-min)));
 }
 
 /*
@@ -66,9 +80,9 @@ Force calcForce(Body* body1, Body* body2)
   Force tempForce;
   data_t dist = distance(body1,body2);
   data_t angle = (data_t) asin(abs(body1->y_pos-body2->y_pos)/dist);
-  data_t grav_force = ((-1)* G * (body1->mass * body2->mass))/dist;
-  tempForce.u_vec += grav_force * cos(angle);
-  tempForce.v_vec += grav_force * sin(angle);
+  data_t grav_force = ((-1)* G * (body1->mass * body2->mass))/(dist*dist);
+  tempForce.u_vec = grav_force * cos(angle);
+  tempForce.v_vec = grav_force * sin(angle);
 
   return tempForce;
 }
@@ -83,7 +97,7 @@ Force calcTotalForce(Body* bodyArr,int bodyNum, int totalNum)
   for(i=0;i<totalNum;i++)
   {
     if(i!=bodyNum){
-      tempForce = calcForce(&bodyArr[bodyNum],&bodyArr[i]);     // need to declare this
+      tempForce = calcForce(&bodyArr[bodyNum],&bodyArr[i]);
       totalForce.u_vec += tempForce.u_vec;
       totalForce.v_vec += tempForce.v_vec;
     }
@@ -91,14 +105,8 @@ Force calcTotalForce(Body* bodyArr,int bodyNum, int totalNum)
   return totalForce;
 }
 
-// don't need this function any more
-
 void updateBody(Body* pointForce)
 {
-  // recalculate the velocity vectors
-  //pointForce->u_vec += totalForce->u_vec;
-  //pointForce->v_vec += totalForce->v_vec;
-
   // update to new position from new vectors
   pointForce->x_pos +=(TIME_STEP*(pointForce->u_vec));
   pointForce->y_pos +=(TIME_STEP*(pointForce->v_vec));
@@ -125,33 +133,30 @@ void NbodyCalc(Body* bodyArr, int totalNum)
 
 int main()
 {
-  Body bod,bd;
-  data_t x,y,u,v,r,q;
-  u = 10;
-  v = 9;
-  x = 1;
-  y = 2;
-  bod.x_pos = x;
-  bod.y_pos = y;
-  bod.u_vec = u;
-  bod.v_vec = v;
+  Body b[N_BODY_NUM];
+  int i,j,numBod = N_BODY_NUM;
+  srand(time(NULL));
+  initBodies(b,numBod);
 
-  bd.x_pos = 8;
-  bd.y_pos = 3;
-  bd.u_vec = 3;
-  bd.v_vec = 2;
+  //  printf("%f %f %f %f \n", bod.u_vec, bod.v_vec, bod.x_pos ,bod.y_pos);
 
-  printf("%f %f %f %f \n", bod.u_vec, bod.v_vec, bod.x_pos ,bod.y_pos);
-
-  Force fc;
-  fc.u_vec = 7;
-  fc.v_vec = 5;
-
-  data_t dis = distance(&bod, &bd);
-
-  updateBody(&bod);
-
-  printf("%f %f %f %f %f\n", bod.u_vec, bod.v_vec, bod.x_pos ,bod.y_pos, dis);
+  printf("N-body#,posx,posy,velx,vely\n");
+  for(i=0;i<numBod;i++)
+  {
+    printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
+        b[i].x_pos,b[i].y_pos,b[i].u_vec,b[i].v_vec);
+  }
+  NbodyCalc(b,numBod);
+  printf("\n########################### NEW STUFF ###################################\n\n");
+    printf("N-body#,posx,posy,velx,vely\n");
+  for(i=0;i<numBod;i++)
+  {
+    printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
+        b[i].x_pos,b[i].y_pos,b[i].u_vec,b[i].v_vec);
+  }
+  /*for(i=0;i<10;i++)
+    printf("%f    %d\n",fRand(10,-10,i+124134423984),i);
+    */
   return 0;
 }
 
