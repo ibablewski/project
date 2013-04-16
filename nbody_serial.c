@@ -15,7 +15,7 @@
 
 #define G             6.67384E-11
 #define PI            3.14159265
-#define DT     0.001           //  0.001 second time increments
+#define DT	      0.001           //  0.001 second time increments
 #define N_BODY_NUM    100
 
 typedef float data_t;
@@ -133,29 +133,31 @@ int main()
   srand(time(NULL));
   initBodies(b,numBod);
 
-  printf("N-body#,posx,posy,velx,vely\n");
+/*  printf("N-body#,posx,posy,velx,vely\n");
   for(i=0;i<numBod;i++)
   {
     printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
-        b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel/*,b[i].x_acc, b[i].y_acc*/);
+        b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel);
   }
+*/
   clock_gettime(CLOCK_REALTIME, &time1);
 
   for(j=0;j<1000;j++)
       NbodyCalc(b,numBod);
 
   clock_gettime(CLOCK_REALTIME, &time2);
-  printf("\n########################### NEW STUFF ###################################\n\n");
+/*  printf("\n########################### NEW STUFF ###################################\n\n");
   printf("N-body#,posx,posy,velx,vely\n");
   printf("%d\n",numBod);
 
   for(i=0;i<numBod;i++)
   {
     printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
-        b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel/*,b[i].x_acc, b[i].y_acc*/);
+        b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel);
   }
+*/
   time_stamp = diff(time1,time2);
-  printf("Execution time: %15.9ld\n",(double)(time_stamp.tv_sec + time_stamp.tv_nsec/1.0e9));
+  printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
   return 0;
 }
 
