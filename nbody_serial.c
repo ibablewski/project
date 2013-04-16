@@ -15,7 +15,7 @@
 
 #define G             6.67384E-11
 #define PI            3.14159265
-#define TIME_STEP     0.001           //  0.001 second time increments
+#define DT     0.001           //  0.001 second time increments
 #define N_BODY_NUM    100
 
 typedef float data_t;
@@ -24,17 +24,18 @@ typedef struct body {
   data_t mass;    // constant mass
   data_t x_pos;     // x-position in solution space
   data_t y_pos;     // y-position in solution space
-  data_t u_vec;     // u-vecor = velocity vector in the x direction
-  data_t v_vec;     // v-vector = velocity vector in the y direction
-
+  data_t x_vel;     // velocity vector in the x direction
+  data_t y_vel;     // velocity vector in the y direction
+  //  data_t x_acc;     // x acceleration
+  //  data_t y_acc;     // y acceleration
 }Body;
 
 typedef struct forceVec {     // stuct to hold vector data on total Force exerted on single body
-  data_t u_vec;
-  data_t v_vec;
+  data_t x_vel;             // don't think we need this. I Think we may be able to eliminate
+  data_t y_vel;
 }Force;
 
-inline data_t distance(Body* body1, Body* body2)
+inline data_t invDistance(Body* body1, Body* body2)
 {
   return (data_t) sqrt((body1->x_pos-body2->x_pos)*(body1->x_pos-body2->x_pos) + 
       (body1->y_pos-body2->y_pos)*(body1->y_pos-body2->y_pos));
@@ -51,8 +52,8 @@ int initBodies(Body* bodies, int Num)
     bodies[i].mass = fRand(100000.0,-100000.0,i);
     bodies[i].x_pos = fRand(10,-10,i+mult);
     bodies[i].y_pos = fRand(10,-10,i+2*mult);
-    bodies[i].u_vec = fRand(10,-10,i+3*mult);
-    bodies[i].v_vec = fRand(10,-10,i+4*mult);
+    bodies[i].x_vel = fRand(10,-10,i+3*mult);
+    bodies[i].y_vel = fRand(10,-10,i+4*mult);
     mult+=81722171%192323820820392;
   }
 
@@ -70,93 +71,69 @@ data_t fRand(float max, float min, int seed)     // need to iterate over seed ke
  *  F = G*(m_1*m_2)/r^2  Where G is the gravitational Constant
  *  formally, the force exerted from gravity is operable in the opposite direction of
  *  it's field. Therefore, the above will be nevative in practice.
- * 
- * */
+ *
+ */
 
-
-// where body one is point mass, body two is body acting on it
-Force calcForce(Body* body1, Body* body2)
-{
-  Force tempForce;
-  data_t dist = distance(body1,body2);
-  data_t angle = (data_t) asin(abs(body1->y_pos-body2->y_pos)/dist);
-  data_t grav_force = ((-1)* G * (body1->mass * body2->mass))/(dist*dist);
-  tempForce.u_vec = grav_force * cos(angle);
-  tempForce.v_vec = grav_force * sin(angle);
-
-  return tempForce;
-}
-
-// calcs total force on one body from all others
-// iterating from 0 to N-1
-Force calcTotalForce(Body* bodyArr,int bodyNum, int totalNum)
-{
-  int i,j;
-  Force totalForce;
-  Force tempForce;
-  for(i=0;i<totalNum;i++)
-  {
-    if(i!=bodyNum){
-      tempForce = calcForce(&bodyArr[bodyNum],&bodyArr[i]);
-      totalForce.u_vec += tempForce.u_vec;
-      totalForce.v_vec += tempForce.v_vec;
-    }
-  }
-  return totalForce;
-}
-
-void updateBody(Body* pointForce)
-{
-  // update to new position from new vectors
-  pointForce->x_pos +=(TIME_STEP*(pointForce->u_vec));
-  pointForce->y_pos +=(TIME_STEP*(pointForce->v_vec));
-
-}
 
 void NbodyCalc(Body* bodyArr, int totalNum)
 {
-  Force tempForce;
-  int i = 0;
-  for(i=0; i < totalNum;i++)
+  int i,j;
+  data_t posTemp[totalNum*2];
+  for(i=0;i<totalNum;i++)
   {
-    tempForce = calcTotalForce(bodyArr, i , totalNum);
-    bodyArr[i].u_vec += tempForce.u_vec;
-    bodyArr[i].v_vec += tempForce.v_vec;
-  }
+    data_t x_acc=0;
+    data_t y_acc=0;
+    //bodyArr->z_acc=0;
+    for(j=0;j<totalNum;j++)
+    {
+      if(i!=j){
+        data_t dx = bodyArr[i].x_pos - bodyArr[j].x_pos;
+        data_t dy = bodyArr[i].y_pos - bodyArr[j].y_pos;
+        data_t inv = 1.0/sqrt(dx*dx + dy*dy);
+        data_t force = G*bodyArr[j].mass*bodyArr[i].mass*inv*inv*inv;
+        x_acc += force*dx;
+        y_acc += force*dy;
+      }
+    }
+    posTemp[i*2] = bodyArr[i].x_pos + DT*(bodyArr[i].x_vel) + 0.5*DT*DT*(x_acc);
+    posTemp[i*2+1] = bodyArr[i].y_pos + DT*(bodyArr[i].y_vel) + 0.5*DT*DT*(y_acc);
+    bodyArr[i].x_vel+= DT*(x_acc);
+    bodyArr[i].y_vel+= DT*(y_acc);
 
-  for(i=0; i< totalNum; i++)
+  }
+  for(i = 0; i < totalNum; i++)
   {
-    bodyArr[i].x_pos +=(TIME_STEP*(bodyArr[i].u_vec));
-    bodyArr[i].y_pos +=(TIME_STEP*(bodyArr[i].v_vec));
+    bodyArr[i].x_pos = posTemp[i*2];
+    bodyArr[i].y_pos = posTemp[i*2+1];
   }
 }
 
 int main()
 {
   Body b[N_BODY_NUM];
-  int i,j,numBod = N_BODY_NUM;
+  int i,j;
+  int numBod = N_BODY_NUM;
   srand(time(NULL));
   initBodies(b,numBod);
-
-  //  printf("%f %f %f %f \n", bod.u_vec, bod.v_vec, bod.x_pos ,bod.y_pos);
 
   printf("N-body#,posx,posy,velx,vely\n");
   for(i=0;i<numBod;i++)
   {
     printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
-        b[i].x_pos,b[i].y_pos,b[i].u_vec,b[i].v_vec);
+        b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel/*,b[i].x_acc, b[i].y_acc*/);
   }
+
   NbodyCalc(b,numBod);
+
   printf("\n########################### NEW STUFF ###################################\n\n");
-    printf("N-body#,posx,posy,velx,vely\n");
+  printf("N-body#,posx,posy,velx,vely\n");
+  printf("%d\n",numBod);
+
   for(i=0;i<numBod;i++)
   {
     printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
-        b[i].x_pos,b[i].y_pos,b[i].u_vec,b[i].v_vec);
+        b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel/*,b[i].x_acc, b[i].y_acc*/);
   }
-  /*for(i=0;i<10;i++)
-    printf("%f    %d\n",fRand(10,-10,i+124134423984),i);
-    */
   return 0;
 }
 
