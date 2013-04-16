@@ -26,8 +26,6 @@ typedef struct body {
   data_t y_pos;     // y-position in solution space
   data_t x_vel;     // velocity vector in the x direction
   data_t y_vel;     // velocity vector in the y direction
-  //  data_t x_acc;     // x acceleration
-  //  data_t y_acc;     // y acceleration
 }Body;
 
 typedef struct forceVec {     // stuct to hold vector data on total Force exerted on single body
@@ -37,7 +35,7 @@ typedef struct forceVec {     // stuct to hold vector data on total Force exerte
 
 inline data_t invDistance(Body* body1, Body* body2)
 {
-  return (data_t) sqrt((body1->x_pos-body2->x_pos)*(body1->x_pos-body2->x_pos) + 
+  return (data_t) sqrt((body1->x_pos-body2->x_pos)*(body1->x_pos-body2->x_pos) +
       (body1->y_pos-body2->y_pos)*(body1->y_pos-body2->y_pos));
 }
 
@@ -83,14 +81,15 @@ void NbodyCalc(Body* bodyArr, int totalNum)
   {
     data_t x_acc=0;
     data_t y_acc=0;
-    //bodyArr->z_acc=0;
+    //    data_t z_acc=0;
     for(j=0;j<totalNum;j++)
     {
       if(i!=j){
         data_t dx = bodyArr[i].x_pos - bodyArr[j].x_pos;
         data_t dy = bodyArr[i].y_pos - bodyArr[j].y_pos;
+        //        data_t dz = bodyArr[i].z_pos - bodyArr[j].z_pos;
         data_t inv = 1.0/sqrt(dx*dx + dy*dy);
-        data_t force = G*bodyArr[j].mass*bodyArr[i].mass*inv*inv*inv;
+        data_t force = G*bodyArr[j].mass*bodyArr[i].mass*inv*inv;
         x_acc += force*dx;
         y_acc += force*dy;
       }
@@ -108,8 +107,26 @@ void NbodyCalc(Body* bodyArr, int totalNum)
   }
 }
 
+struct timespec diff(struct timespec start, struct timespec end)
+{
+  struct timespec temp;
+  if ((end.tv_nsec-start.tv_nsec)<0) {
+    temp.tv_sec = end.tv_sec-start.tv_sec-1;
+    temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+  } else {
+    temp.tv_sec = end.tv_sec-start.tv_sec;
+    temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+  }
+  return temp;
+}
+
 int main()
 {
+
+  struct timespec diff(struct timespec start, struct timespec end);
+  struct timespec time1, time2;
+  struct timespec time_stamp;
+
   Body b[N_BODY_NUM];
   int i,j;
   int numBod = N_BODY_NUM;
@@ -122,9 +139,12 @@ int main()
     printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
         b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel/*,b[i].x_acc, b[i].y_acc*/);
   }
+  clock_gettime(CLOCK_REALTIME, &time1);
 
-  NbodyCalc(b,numBod);
+  for(j=0;j<1000;j++)
+      NbodyCalc(b,numBod);
 
+  clock_gettime(CLOCK_REALTIME, &time2);
   printf("\n########################### NEW STUFF ###################################\n\n");
   printf("N-body#,posx,posy,velx,vely\n");
   printf("%d\n",numBod);
@@ -134,6 +154,7 @@ int main()
     printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
         b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel/*,b[i].x_acc, b[i].y_acc*/);
   }
+  time_stamp = diff(time1,time2);
   return 0;
 }
 
