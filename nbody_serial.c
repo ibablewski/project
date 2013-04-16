@@ -155,6 +155,7 @@ int main()
         b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel/*,b[i].x_acc, b[i].y_acc*/);
   }
   time_stamp = diff(time1,time2);
+  printf("Execution time: %15.9ld\n",(double)(time_stamp.tv_sec + time_stamp.tv_nsec/1.0e9));
   return 0;
 }
 
