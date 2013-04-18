@@ -4,6 +4,8 @@
  * baseline. We will need to look at units to make sure that all
  * units align well. I suggest using metric.
  *
+ *  NOTE** updated for the Van Der Waals assignment
+ *
  * */
 
 #include <stdio.h>
@@ -12,8 +14,10 @@
 #include <stdlib.h>
 #include <errno.h>
 
-
-#define G             6.67384E-11
+#define EPS	      1
+#define SIG	      1e-2
+#define CUT	      2.5
+#define RCUT	      (CUT*SIG)
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments
 #define N_BODY_NUM    1000
@@ -21,22 +25,21 @@
 typedef float data_t;
 
 typedef struct body {
-  data_t mass;    // constant mass
-  data_t x_pos;     // x-position in solution space
-  data_t y_pos;     // y-position in solution space
-  data_t x_vel;     // velocity vector in the x direction
-  data_t y_vel;     // velocity vector in the y direction
+  data_t xp;     // x-position in solution space
+  data_t yp;     // y-position in solution space
+  data_t xv;     // velocity vector in the x direction
+  data_t yv;     // velocity vector in the y direction
 }Body;
 
 typedef struct forceVec {     // stuct to hold vector data on total Force exerted on single body
-  data_t x_vel;             // don't think we need this. I Think we may be able to eliminate
-  data_t y_vel;
+  data_t xv;             // don't think we need this. I Think we may be able to eliminate
+  data_t yv;
 }Force;
 
 inline data_t invDistance(Body* body1, Body* body2)
 {
-  return (data_t) sqrt((body1->x_pos-body2->x_pos)*(body1->x_pos-body2->x_pos) +
-      (body1->y_pos-body2->y_pos)*(body1->y_pos-body2->y_pos));
+  return (data_t) sqrt((body1->xp-body2->xp)*(body1->xp-body2->xp) +
+      (body1->yp-body2->yp)*(body1->yp-body2->yp));
 }
 
 data_t fRand(float,float,int);
@@ -48,10 +51,10 @@ int initBodies(Body* bodies, int Num)
   for(i=0; i< Num; i++)
   {
     bodies[i].mass = fRand(100000.0,-100000.0,i);
-    bodies[i].x_pos = fRand(10,-10,i+mult);
-    bodies[i].y_pos = fRand(10,-10,i+2*mult);
-    bodies[i].x_vel = fRand(10,-10,i+3*mult);
-    bodies[i].y_vel = fRand(10,-10,i+4*mult);
+    bodies[i].xp = fRand(10,-10,i+mult);
+    bodies[i].yp = fRand(10,-10,i+2*mult);
+    bodies[i].xv = fRand(10,-10,i+3*mult);
+    bodies[i].yv = fRand(10,-10,i+4*mult);
     mult+=81722171%192323820820392;
   }
 
@@ -85,8 +88,8 @@ void NbodyCalc(Body* bodyArr, int totalNum)
     for(j=0;j<totalNum;j++)
     {
       if(i!=j){
-        data_t dx = bodyArr[i].x_pos - bodyArr[j].x_pos;
-        data_t dy = bodyArr[i].y_pos - bodyArr[j].y_pos;
+        data_t dx = bodyArr[i].xp - bodyArr[j].xp;
+        data_t dy = bodyArr[i].yp - bodyArr[j].yp;
         //        data_t dz = bodyArr[i].z_pos - bodyArr[j].z_pos;
         data_t inv = 1.0/sqrt(dx*dx + dy*dy);
         data_t force = G*bodyArr[j].mass*bodyArr[i].mass*inv*inv;
@@ -94,16 +97,16 @@ void NbodyCalc(Body* bodyArr, int totalNum)
         y_acc += force*dy;
       }
     }
-    posTemp[i*2] = bodyArr[i].x_pos + DT*(bodyArr[i].x_vel) + 0.5*DT*DT*(x_acc);
-    posTemp[i*2+1] = bodyArr[i].y_pos + DT*(bodyArr[i].y_vel) + 0.5*DT*DT*(y_acc);
-    bodyArr[i].x_vel+= DT*(x_acc);
-    bodyArr[i].y_vel+= DT*(y_acc);
+    posTemp[i*2] = bodyArr[i].xp + DT*(bodyArr[i].xv) + 0.5*DT*DT*(x_acc);
+    posTemp[i*2+1] = bodyArr[i].yp + DT*(bodyArr[i].yv) + 0.5*DT*DT*(y_acc);
+    bodyArr[i].xv+= DT*(x_acc);
+    bodyArr[i].yv+= DT*(y_acc);
 
   }
   for(i = 0; i < totalNum; i++)
   {
-    bodyArr[i].x_pos = posTemp[i*2];
-    bodyArr[i].y_pos = posTemp[i*2+1];
+    bodyArr[i].xp = posTemp[i*2];
+    bodyArr[i].yp = posTemp[i*2+1];
   }
 }
 
@@ -137,7 +140,7 @@ int main()
   for(i=0;i<numBod;i++)
   {
     printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
-        b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel);
+        b[i].xp,b[i].yp,b[i].xv,b[i].yv);
   }
 */
   clock_gettime(CLOCK_REALTIME, &time1);
@@ -153,7 +156,7 @@ int main()
   for(i=0;i<numBod;i++)
   {
     printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
-        b[i].x_pos,b[i].y_pos,b[i].x_vel,b[i].y_vel);
+        b[i].xp,b[i].yp,b[i].xv,b[i].yv);
   }
 */
   time_stamp = diff(time1,time2);
