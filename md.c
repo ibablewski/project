@@ -13,6 +13,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 
 #define EPS	      1
 #define SIG	      1e-2
@@ -28,7 +29,7 @@
 #define YMIN	      -0.5
 #define T0          1
 #define MAX_TRIALS  100
-#define ITERS       1
+#define ITERS       100
 #define BOX_SIZE    1.0
 
 typedef float data_t;
@@ -79,8 +80,8 @@ int init_particles(int n, float* x, float* v, params* param)
     /* Choose new point via rejection sampling */
     for(trial = 0; (trial < MAX_TRIALS) && (r2 < min_r2); trial++)
     {
-      x[2*i] = (float) (BOX_SIZE*drand48()) - BOX_SIZE/2;
-      x[2*i+1] = (float) (BOX_SIZE*drand48()) - BOX_SIZE/2;
+      x[2*i] = (float) (BOX_SIZE*drand48()) - BOX_SIZE/2.0;
+      x[2*i+1] = (float) (BOX_SIZE*drand48()) - BOX_SIZE/2.0;
 
       for(j=0; j < i; j++)
       {
@@ -99,18 +100,20 @@ int init_particles(int n, float* x, float* v, params* param)
   return n;
 }
 
-void init_particles_v(int n, float* v, params* param)
+void init_particles_va(int n, float* v,float* a, params* param)
 {
   float R,T;
   int i;
-
+  
   for(i=0; i < n; i++)
   {
     R = T0 * sqrt(-2.0 * log(drand48()));
     T = 2 * PI * drand48();
     v[2*i] = (R * cos(T));
     v[2*i+1] = (R * sin(T));
-//    printf("SampleVel%d %f %f\n",i,v[2*i],v[2*i+1]);
+    //    printf("SampleVel%d %f %f\n",i,v[2*i],v[2*i+1]);
+    a[2*i] = (R * cos(T))/param->dt;
+    a[2*i+1] = (R * sin(T))/param->dt;
   }
 }
 
@@ -147,11 +150,25 @@ void verletInt1(int n, float dt, float* x, float* v, float* a)	    // num bodies
 
 void verletInt2(int n, float dt, float* x, float* v, float* a)	    // num bodies, delta time, pos, vel, acc   with updated acc
 {
-  int i =0;
+  int v0,v1,i =0;
   for(i = 0; i < n; i++)
   {
+    v0 = v[2*i];
+    v1 = v[2*i+1];
     v[2*i] = a[2*i] * dt/2.0;		    // split up for 2D
-    v[2*i] = a[2*i] * dt/2.0;	
+    v[2*i] = a[2*i] * dt/2.0;
+    a[2*i] += (v[2*i]-v0)/dt;
+    a[2*i+1] += (v[2*i+1]-v1)/dt;
+  }
+}
+
+void computeAcc(int n, float* F, float* a)        // mass assumed to my constant and 1
+{
+  int i;
+  for(i=0; i< n; i++)
+  {
+    a[2*i] = F[2*i];
+    a[2*i+1] = F[2*i+1];
   }
 }
 
@@ -168,10 +185,10 @@ void box_reflect(int n, float* x, float* v, float* a)
   int i=0;
   for(i = 0; i < n; i++)
   {
-    if(x[2*i] > XMIN) reflect(XMIN,&x[2*i],&v[2*i],&a[2*i]);
-    if(x[2*i] < XMAX) reflect(XMAX,&x[2*i],&v[2*i],&a[2*i]);
-    if(x[2*i+1] > YMIN) reflect(YMIN,&x[2*i+1],&v[2*i+1],&a[2*i+1]);
-    if(x[2*i+1] < YMAX) reflect(YMAX,&x[2*i+1],&v[2*i+1],&a[2*i+1]);
+    if(x[2*i] < XMIN) reflect(XMIN,&x[2*i],&v[2*i],&a[2*i]);
+    if(x[2*i] > XMAX) reflect(XMAX,&x[2*i],&v[2*i],&a[2*i]);
+    if(x[2*i+1] < YMIN) reflect(YMIN,&x[2*i+1],&v[2*i+1],&a[2*i+1]);
+    if(x[2*i+1] > YMAX) reflect(YMAX,&x[2*i+1],&v[2*i+1],&a[2*i+1]);
   }
 }
 
@@ -188,13 +205,15 @@ void compute_forces(int n, float* x, float* F)
   {
     for(j = 0; j < n; j++)
     {
-      dx = x[2*j] - x[2*i];
-      dy = x[2*j+1] - x[2*j+1];
-      lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
-      F[2*i] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
-      F[2*i+1] += lj_scalar * dy;
-      F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
-      F[2*j+1] -= lj_scalar * dy;
+      if(i!=j){
+        dx = x[2*j] - x[2*i];
+        dy = x[2*j+1] - x[2*i+1];
+        lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
+        F[2*i] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
+        F[2*i+1] += lj_scalar * dy;
+        F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
+        F[2*j+1] -= lj_scalar * dy;
+      }
     }
   }
 }
@@ -221,23 +240,27 @@ int main(int argc, char** argv)
     fprintf(stderr, "Could not generate %d particles, Trying %d particles instead\n",param.npart,npart);
     param.npart = npart;
   }
-  init_particles_v(param.npart,mol.v, &param);
+  init_particles_va( param.npart, mol.v,mol.a, &param);
   compute_forces(param.npart,mol.x,mol.F);
   for(i=0;i<ITERS;i++)
   {
+    //memset(mol.F, 0 , 2*param.npart * sizeof(float));
+    printf("acc10: %f\n", mol.a[i]);
     verletInt1(param.npart,param.dt , mol.x, mol.v,mol.a);
     box_reflect(param.npart,mol.x,mol.v,mol.a );
-    compute_forces(npart,mol.x,mol.F);
+    compute_forces(param.npart,mol.x,mol.F);
     verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
+    //computeAcc(param.npart,mol.F,mol.a);
+    memset(mol.F, 0 , 2*param.npart * sizeof(float));
+    //printf("acc10: %f\n", mol.a[i]);
   }
   for(i=0; i < param.npart; i++)
   {
-    printf("nBody-Num: %d Posx: %f Velx: %f Accx: %f Forcex: %f\n",param.npart,
+    printf("nBody-Num: %d Posx: %f Velx: %f Accx: %f Forcex: %f\n",i,
         mol.x[2*i],mol.v[2*i],mol.a[2*i],mol.F[2*i]);
-    printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",param.npart,
+    printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
         mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
   }
-
 
   free(mol.x);
   free(mol.v);
