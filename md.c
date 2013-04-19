@@ -220,6 +220,11 @@ void compute_forces(int n, float* x, float* F)
 
 int main(int argc, char** argv)
 {
+  struct timespec diff(struct timespec start, struct timespec end);
+  struct timespec time1, time2;
+  struct timespec time_stamp;
+
+
   int npart,i;
   params param;
   param.npart = N_BODY_NUM;
@@ -241,6 +246,17 @@ int main(int argc, char** argv)
     param.npart = npart;
   }
   init_particles_va( param.npart, mol.v,mol.a, &param);
+
+  for(i=0; i < param.npart; i++)
+  {
+    printf("nBody-Num: %d Posx: %f Velx: %f Accx: %f Forcex: %f\n",i,
+        mol.x[2*i],mol.v[2*i],mol.a[2*i],mol.F[2*i]);
+    printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
+        mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
+  }
+
+  clock_gettime(CLOCK_REALTIME, &time1);
+
   compute_forces(param.npart,mol.x,mol.F);
   for(i=0;i<ITERS;i++)
   {
@@ -254,6 +270,7 @@ int main(int argc, char** argv)
     memset(mol.F, 0 , 2*param.npart * sizeof(float));
     //printf("acc10: %f\n", mol.a[i]);
   }
+  clock_gettime(CLOCK_REALTIME, &time2);
   for(i=0; i < param.npart; i++)
   {
     printf("nBody-Num: %d Posx: %f Velx: %f Accx: %f Forcex: %f\n",i,
@@ -261,6 +278,8 @@ int main(int argc, char** argv)
     printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
         mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
   }
+  time_stamp = diff(time1,time2);
+  printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
 
   free(mol.x);
   free(mol.v);
@@ -268,6 +287,21 @@ int main(int argc, char** argv)
   free(mol.F);
   printf("Done\n");
 }
+
+struct timespec diff(struct timespec start, struct timespec end)
+{
+  struct timespec temp;
+  if ((end.tv_nsec-start.tv_nsec)<0) {
+    temp.tv_sec = end.tv_sec-start.tv_sec-1;
+    temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+  } else {
+    temp.tv_sec = end.tv_sec-start.tv_sec;
+    temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+  }
+  return temp;
+}
+
+
 /*
    void NbodyCalc(Body* bodyArr, int totalNum)
    {
