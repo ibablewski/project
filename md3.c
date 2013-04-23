@@ -257,7 +257,7 @@ int main(int argc, char** argv)
         mol.x[3*i],mol.v[3*i],mol.a[3*i],mol.F[3*i]);
     printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
         mol.x[3*i+1],mol.v[3*i+1],mol.a[3*i+1],mol.F[3*i+1]);
-    printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
+    printf("nBody-Num: %d Posz: %f Vely: %f Accy: %f Forcey: %f\n",i,
         mol.x[3*i+2],mol.v[3*i+2],mol.a[3*i+2],mol.F[3*i+2]);
   }
 
@@ -273,7 +273,7 @@ int main(int argc, char** argv)
     compute_forces(param.npart,mol.x,mol.F);
     verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
     //computeAcc(param.npart,mol.F,mol.a);
-    memset(mol.F, 0 , 2*param.npart * sizeof(float));
+    memset(mol.F, 0 , 3*param.npart * sizeof(float));
     //printf("acc10: %f\n", mol.a[i]);
   }
  // clock_gettime(CLOCK_REALTIME, &time2);
@@ -284,7 +284,7 @@ int main(int argc, char** argv)
         mol.x[3*i],mol.v[3*i],mol.a[3*i],mol.F[3*i]);
     printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
         mol.x[3*i+1],mol.v[3*i+1],mol.a[3*i+1],mol.F[3*i+1]);
-    printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
+    printf("nBody-Num: %d Posz: %f Vely: %f Accy: %f Forcey: %f\n",i,
         mol.x[3*i+2],mol.v[3*i+2],mol.a[3*i+2],mol.F[3*i+2]);
   }
 
