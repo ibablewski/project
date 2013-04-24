@@ -21,16 +21,21 @@
 #define RCUT	      (CUT*SIG)
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
-#define DT	      0.001           //  0.001 second time increments
-#define N_BODY_NUM    10000
+#define DT	      0.0001           //  0.001 second time increments
+#define N_BODY_NUM    100
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
 #define YMIN	      -(BOX_SIZE/2.0)
-#define T0          1
-#define MAX_TRIALS  10
-#define ITERS       100
-#define BOX_SIZE    10.0
+#define T0	      1
+#define MAX_TRIALS    10
+#define ITERS         100
+#define BOX_SIZE      10.0
+#define GRID_NUM      10.0
+
+#define GRID_BLOCK_SIZE(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/GRID_NUM)
+
+
 
 typedef float data_t;
 
@@ -48,14 +53,15 @@ typedef struct molecule {
     float* F;
 }mols;
 
-data_t fRand(float,float,int);
+typedef struct adj {
+    int* near;
+}adj;
 
-data_t fRand(float max, float min, int seed)     // need to iterate over seed key or else same result
+
+int maxNumPartPerBlock(float blockSize, float sig)
 {
-    srand(seed);
-    return (data_t) (min + ((float)(rand()/(float)RAND_MAX)*(float)(max-min)));
-}
-
+    return ((blockSize*blockSize)/(sig*sig));
+}                                    
 
 int init_particles(int n, float* x, float* v, params* param)
 {
@@ -276,9 +282,11 @@ int main(int argc, char** argv)
        }
      */  
 
+    printf("%d\n", maxNumPartPerBlock(0.1,SIG));
     time_stamp = diff(time1,time2);
     printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
 
+    
     free(mol.x);
     free(mol.v);
     free(mol.a);
@@ -301,99 +309,4 @@ struct timespec diff(struct timespec start, struct timespec end)
     return temp;
 }
 
-<<<<<<< HEAD
-=======
 
-/*
-   void NbodyCalc(Body* bodyArr, int totalNum)
-   {
-   int i,j;
-   data_t posTemp[totalNum*2];
-   for(i=0;i<totalNum;i++)
-   {
-   data_t x_acc=0;
-   data_t y_acc=0;
-//    data_t z_acc=0;
-for(j=0;j<totalNum;j++)
-{
-if(i!=j){
-data_t dx = bodyArr[i].xp - bodyArr[j].xp;
-data_t dy = bodyArr[i].yp - bodyArr[j].yp;
-//        data_t dz = bodyArr[i].z_pos - bodyArr[j].z_pos;
-data_t inv = 1.0/sqrt(dx*dx + dy*dy);
-data_t force = G*bodyArr[j].mass*bodyArr[i].mass*inv*inv;
-x_acc += force*dx;
-y_acc += force*dy;
-}
-}
-posTemp[i*2] = bodyArr[i].xp + DT*(bodyArr[i].xv) + 0.5*DT*DT*(x_acc);
-posTemp[i*2+1] = bodyArr[i].yp + DT*(bodyArr[i].yv) + 0.5*DT*DT*(y_acc);
-bodyArr[i].xv+= DT*(x_acc);
-bodyArr[i].yv+= DT*(y_acc);
-
-}
-for(i = 0; i < totalNum; i++)
-{
-bodyArr[i].xp = posTemp[i*2];
-bodyArr[i].yp = posTemp[i*2+1];
-}
-}
-
-struct timespec diff(struct timespec start, struct timespec end)
-{
-struct timespec temp;
-if ((end.tv_nsec-start.tv_nsec)<0) {
-temp.tv_sec = end.tv_sec-start.tv_sec-1;
-temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
-} else {
-temp.tv_sec = end.tv_sec-start.tv_sec;
-temp.tv_nsec = end.tv_nsec-start.tv_nsec;
-}
-return temp;
-}
-
-int main()
-{
-
-struct timespec diff(struct timespec start, struct timespec end);
-struct timespec time1, time2;
-struct timespec time_stamp;
-
-Body b[N_BODY_NUM];
-int i,j;
-int numBod = N_BODY_NUM;
-srand(time(NULL));
-initBodies(b,numBod);
- */
-/*  printf("N-body#,posx,posy,velx,vely\n");
-    for(i=0;i<numBod;i++)
-    {
-    printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
-    b[i].xp,b[i].yp,b[i].xv,b[i].yv);
-    }
- */
-/*
-   clock_gettime(CLOCK_REALTIME, &time1);
-
-   for(j=0;j<1000;j++)
-   NbodyCalc(b,numBod);
-
-   clock_gettime(CLOCK_REALTIME, &time2);
- */
-/*  printf("\n########################### NEW STUFF ###################################\n\n");
-    printf("N-body#,posx,posy,velx,vely\n");
-    printf("%d\n",numBod);
-
-    for(i=0;i<numBod;i++)
-    {
-    printf(" %d, %15.7f, %15.7f,%15.7f,%15.7f\n", i,
-    b[i].xp,b[i].yp,b[i].xv,b[i].yv);
-    }
- */
-/*
-   time_stamp = diff(time1,time2);
-   printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
-   return 0;
-   }
- */
->>>>>>> eea18d2d30e20f277757f7d75465cab1397e4a99
