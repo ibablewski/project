@@ -19,12 +19,12 @@
 
 #define EPS	      1
 #define SIG	      1e-2
-#define CUT	      5
+#define CUT	      2.5
 #define RCUT	      (CUT*SIG)
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.0001           //  0.001 second time increments
-#define N_BODY_NUM    100
+#define N_BODY_NUM    1000
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -275,6 +275,9 @@ int getMyBlock(int id, int* adj, int numPartsPerBox)
   return i/numPartsPerBox;
 }
 
+// need to edit the main such that we iterate over the particles that are nearest to
+// particle of interest. We are using a cut off value to determine this. Need to write
+// a function to allow us to iterate over the nearby elements.
 
 
 int main(int argc, char** argv)
