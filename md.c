@@ -19,7 +19,7 @@
 
 #define EPS	      1
 #define SIG	      1e-2
-#define CUT	      2.5
+#define CUT	      5
 #define RCUT	      (CUT*SIG)
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
@@ -29,11 +29,11 @@
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
 #define YMIN	      -(BOX_SIZE/2.0)
-#define T0	      1
+#define T0	          1
 #define MAX_TRIALS    10
 #define ITERS         100
 #define BOX_SIZE      1.0
-#define GRID_NUM      10.0
+#define GRID_NUM      (BOX_SIZE)/(RCUT)
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
 
@@ -221,29 +221,71 @@ int maxNumPartPerBlock(float blockSize, float sig)
   return ((blockSize*blockSize)/(sig*sig));
 }
 
-void gridSort(int n)
+void gridSort(int n, int numBlocks, int numPartsPerBox, int* adj, float* x)
 {
-  float step = BOX_SIZE/GRID_NUM;
-  int blocks = (int) GRID_NUM*GRID_NUM;
-  int cnt[blocks];    // total # of blocks
-  int i,j,k;
-  for(i=0;i<n;i++)
+  float start = (BOX_SIZE/2.0)-BOX_SIZE;
+  float step = RCUT;                            // width of each block
+  int totBlocks = (int) GRID_NUM*GRID_NUM;       // blocks for both in the x and y directions
+  int cnt[totBlocks];                            // total # of blocks
+  float xblk, yblk;
+
+  int i,j,k,tmp;
+
+  memset(cnt,0,totBlocks * sizeof(int));
+
+  for(i=0;i<n;i++)                            // for each nbody
   {
-    /// need to write up some bucket sort code.
-    // must write up a check for both x and y directions to 
-    // categorize the place where the positions should
-    // be! Will most likely need to elaborate to 3D
+/* Look over the X blocks */
+    xblk = start;
+    for(j=0; j<numBlocks; j++)
+    {
+      xblk+=step;
+      if(x[2*i] < xblk)
+      {
+        /* Look over the Y blocks */
+        yblk = start;
+        for(k=0; k < numBlocks; k++)
+        {
+          yblk+=step;
+
+          /* Execute only if in this X,Y blocks */
+          if(x[2*i+1] < yblk)
+          {
+            tmp = cnt[j+k*numBlocks]++;
+            printf("j: %d, k: %d, Block: %d, ActualMap: %d\n",j,k, j+k*numBlocks,(j+k*numBlocks)*numPartsPerBox+tmp);
+            adj[(j+k*numBlocks)*numPartsPerBox+tmp] = 2*i;
+
+            //printf("(%d,%d) ",(j+k*numB) ,2*i);
+            break;
+          }
+        }
+        break;
+      }
+    }
   }
 }
 
+int getMyBlock(int id, int* adj, int numPartsPerBox)
+{
+  int i = 0;
+  while(adj[i]!=id)
+  {
+    i++;
+  }
+  return i/numPartsPerBox;
+}
+
+
+
 int main(int argc, char** argv)
 {
+  printf("%f\n",GRID_NUM);
   struct timespec diff(struct timespec start, struct timespec end);
   struct timespec time1, time2;
   struct timespec time_stamp;
 
 
-  int npart,i,Num;
+  int npart,i,j,Num;
 
   params param;
   mols mol;
@@ -260,16 +302,26 @@ int main(int argc, char** argv)
   mol.F = malloc(2*param.npart * sizeof(float));
 
   double Blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
-  Num = maxNumPartPerBlock(Blength,SIG);
+  Num = maxNumPartPerBlock(RCUT,SIG);
+  if(N_BODY_NUM < Num)
+  {
+    Num = N_BODY_NUM;
+  }
 
-  adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num);
+  adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num/2);
+  memset(adj.n,-1,sizeof(int) * GRID_NUM * GRID_NUM * Num/2);
+
   npart = init_particles(param.npart, mol.x , mol.v, &param);
   if(npart < param.npart)
   {
     fprintf(stderr, "Could not generate %d particles, Trying %d particles instead\n",param.npart,npart);
     param.npart = npart;
   }
+
   init_particles_va( param.npart, mol.v,mol.a, &param);
+  gridSort(npart, GRID_NUM, Num/2, adj.n, mol.x);
+  for(i=0;i<npart;i++)
+    printf("myBlockNum: %d\n",getMyBlock(2*i, adj.n, Num/2));
   /*
      for(i=0; i < param.npart; i++)
      {
@@ -279,25 +331,29 @@ int main(int argc, char** argv)
      mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
      }
      */
+
 #if(LINUX)
+
   clock_gettime(CLOCK_REALTIME, &time1);
+
 #endif
+
   compute_forces(param.npart,mol.x,mol.F);
   for(i=0;i<ITERS;i++)
   {
-    //memset(mol.F, 0 , 2*param.npart * sizeof(float));
-    //    printf("acc10: %f\n", mol.a[i]);
     verletInt1(param.npart,param.dt , mol.x, mol.v,mol.a);
     box_reflect(param.npart,mol.x,mol.v,mol.a );
     compute_forces(param.npart,mol.x,mol.F);
     verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
-    //computeAcc(param.npart,mol.F,mol.a);
     memset(mol.F, 0 , 2*param.npart * sizeof(float));
-    //printf("acc10: %f\n", mol.a[i]);
   }
+
 #if(LINUX)
+
   clock_gettime(CLOCK_REALTIME, &time2);
+
 #endif
+
   /*
      for(i=0; i < param.npart; i++)
      {
@@ -307,16 +363,32 @@ int main(int argc, char** argv)
      mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
      }
      */
+
 #if(LINUX)
+
   double blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
   printf("Boxsize: %lf,Blocksize: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,blength, maxNumPartPerBlock(blength,SIG));
   time_stamp = diff(time1,time2);
   printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
+
 #else
-  double blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
-  printf("Boxsize: %lf,Blocksize: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,blength, maxNumPartPerBlock(blength,SIG));
+
+  printf("Boxsize: %lf,BlockNum: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,GRID_NUM, maxNumPartPerBlock(GRID_NUM,SIG));
 
 #endif
+
+/*        // test statements for the grid allocation
+int count =0;
+for(i=0;i<GRID_NUM*GRID_NUM*Num/2;i++)
+{
+  if(adj.n[i]!=-1)
+  {
+    count++;
+  }
+}
+printf("%d\n",count);
+
+*/
 
   free(adj.n);
   free(mol.x);
