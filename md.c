@@ -30,10 +30,11 @@
 #define T0	      1
 #define MAX_TRIALS    10
 #define ITERS         100
-#define BOX_SIZE      10.0
+#define BOX_SIZE      1.0
 #define GRID_NUM      10.0
 
-#define GRID_BLOCK_SIZE(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/GRID_NUM)
+#define GRID_BLOCK_BODIES(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/GRID_NUM)	    // number of bodies in each block
+#define GRID_BLOCK_SIZE(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
 
 
 
@@ -281,8 +282,9 @@ int main(int argc, char** argv)
        mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
        }
      */  
-
-    printf("%d\n", maxNumPartPerBlock(0.1,SIG));
+    double bods = GRID_BLOCK_BODIES(GRID_NUM,BOX_SIZE);
+    double num = GRID_BLOCK_SIZE(GRID_NUM,N_BODY_NUM);
+    printf("Boxsize: %lf,Blocksize: %lf,Bodies: %lf, %d\n",num, BOX_SIZE,bods, maxNumPartPerBlock(0.1,SIG));
     time_stamp = diff(time1,time2);
     printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
 
