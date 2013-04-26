@@ -15,7 +15,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define LINUX       1
+#define LINUX       0
 
 #define EPS	      1
 #define SIG	      1e-2
@@ -146,7 +146,6 @@ void verletInt1(int n, float dt, float* x, float* v, float* a)	    // num bodies
 
 void verletInt2(int n, float dt, float* x, float* v, float* a)	    // num bodies, delta time, pos, vel, acc   with updated acc
 {
-<<<<<<< HEAD
   int v0,v1,i =0;
   for(i = 0; i < n; i++)
   {
@@ -157,18 +156,6 @@ void verletInt2(int n, float dt, float* x, float* v, float* a)	    // num bodies
     a[2*i] += (v[2*i]-v0)/dt;
     a[2*i+1] += (v[2*i+1]-v1)/dt;
   }
-=======
-    int v0,v1,i =0;
-    for(i = 0; i < n; i++)
-    {
-	v0 = v[2*i];
-	v1 = v[2*i+1];
-	v[2*i] = a[2*i] * dt/2.0;		    // split up for 2D
-	v[2*i] = a[2*i] * dt/2.0;
-	a[2*i] += (v[2*i]-v0)/dt;
-	a[2*i+1] += (v[2*i+1]-v1)/dt;
-    }
->>>>>>> 2a8f6454667602a421a9ce95e3272f546322bb11
 }
 
 void computeAcc(int n, float* F, float* a)        // mass assumed to my constant and 1
@@ -355,7 +342,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
 	    }
 	}  
     }
-
+}
     int maxNumPartPerBlock(float blockSize, float sig)
     {
 	return ((blockSize*blockSize)/(sig*sig));
