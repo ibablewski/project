@@ -152,7 +152,7 @@ void verletInt2(int n, float dt, float* x, float* v, float* a)	    // num bodies
     v0 = v[2*i];
     v1 = v[2*i+1];
     v[2*i] = a[2*i] * dt/2.0;		    // split up for 2D
-    v[2*i] = a[2*i] * dt/2.0;
+    v[2*i+1] = a[2*i+1] * dt/2.0;
     a[2*i] += (v[2*i]-v0)/dt;
     a[2*i+1] += (v[2*i+1]-v1)/dt;
   }
