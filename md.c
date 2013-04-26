@@ -15,7 +15,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define LINUX       0
+#define LINUX       1
 
 #define EPS	      1
 #define SIG	      1e-2
@@ -33,7 +33,7 @@
 #define MAX_TRIALS    10
 #define ITERS         100
 #define BOX_SIZE      1.0
-#define GRID_NUM      (BOX_SIZE)/(RCUT)
+#define GRID_NUM      ((BOX_SIZE)/(RCUT))
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
 
@@ -146,16 +146,16 @@ void verletInt1(int n, float dt, float* x, float* v, float* a)	    // num bodies
 
 void verletInt2(int n, float dt, float* x, float* v, float* a)	    // num bodies, delta time, pos, vel, acc   with updated acc
 {
-  int v0,v1,i =0;
-  for(i = 0; i < n; i++)
-  {
-    v0 = v[2*i];
-    v1 = v[2*i+1];
-    v[2*i] = a[2*i] * dt/2.0;		    // split up for 2D
-    v[2*i+1] = a[2*i+1] * dt/2.0;
-    a[2*i] += (v[2*i]-v0)/dt;
-    a[2*i+1] += (v[2*i+1]-v1)/dt;
-  }
+    int v0,v1,i =0;
+    for(i = 0; i < n; i++)
+    {
+	v0 = v[2*i];
+	v1 = v[2*i+1];
+	v[2*i] = a[2*i] * dt/2.0;		    // split up for 2D
+	v[2*i+1] = a[2*i+1] * dt/2.0;
+	a[2*i] += (v[2*i]-v0)/dt;
+	a[2*i+1] += (v[2*i+1]-v1)/dt;
+    }
 }
 
 void computeAcc(int n, float* F, float* a)        // mass assumed to my constant and 1
@@ -202,15 +202,15 @@ void compute_forces(int n, float* x, float* F)
     {
 	for(j = i+1; j < n; j++)
 	{
-	   // if(i!=j){
-		dx = x[2*j] - x[2*i];
-		dy = x[2*j+1] - x[2*i+1];
-		lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
-		F[2*i] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
-		F[2*i+1] += lj_scalar * dy;
-		//F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
-		//F[2*j+1] -= lj_scalar * dy;
-	   // }
+	    // if(i!=j){
+	    dx = x[2*j] - x[2*i];
+	    dy = x[2*j+1] - x[2*i+1];
+	    lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
+	    F[2*i] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
+	    F[2*i+1] += lj_scalar * dy;
+	    //F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
+	    //F[2*j+1] -= lj_scalar * dy;
+	    // }
 	}
     }
 }
@@ -226,12 +226,13 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
 
     for(i=0;i<n;i++)
     {
+	//printf("%d\n",i);
 	two_i = 2*i;
-	myBlock = getMyBlock(two_i,adj,partsPerBlock);
+	myBlock = getMyBlock(n,two_i,adj,partsPerBlock);
 	if(myBlock < blockNum1D)
 	{
 	    // work as if on top row
-	    if(myBlock!=0 || myBlock!=(blockNum1D-1))
+	    if(myBlock!=0 && myBlock!=(blockNum1D-1))
 	    {
 		for(r = 0; r <= blockNum1D; r+=blockNum1D)
 		{
@@ -252,32 +253,10 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
 		    }
 		}  
 	    }
-	    else if(myBlock > (blockNum1D*(blockNum1D-1)))
+	    else if(myBlock==0)
 	    {
-		// work as being on bottom row
-		for(r =(-1)*blockNum1D; r <= 0; r+=blockNum1D)
-		{
-		    for(l=myBlock + r-1 ;l <= myBlock + r +1 ; l++)
-		    {
-			k = 0;
-			tmp = l * partsPerBlock;
-			while(adj[tmp+k]!=-1)
-			{
-			    index = tmp+k;
-			    dx = x[index] - x[two_i];
-			    dy = x[index+1] - x[two_i+1];
-			    lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
-			    F[two_i] += lj_scalar * dx;     	    // pos account for the direction of the vector from base molecule
-			    F[two_i+1] += lj_scalar * dy;
-			    k++;
-			}  
-		    }
-		}  
-	    }
-	    else if(!(myBlock%blockNum1D)) 
-	    {
-		// work as the leftmost column
-		for(r =(-1)*blockNum1D; r <= blockNum1D; r+=blockNum1D)
+		// for the left corner
+		for(r = 0; r <= blockNum1D; r+=blockNum1D)
 		{
 		    for(l=myBlock + r;l <= myBlock + r +1 ; l++)
 		    {
@@ -289,19 +268,19 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
 			    dx = x[index] - x[two_i];
 			    dy = x[index+1] - x[two_i+1];
 			    lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
-			    F[two_i] += lj_scalar * dx;		// pos account for the direction of the vector from base molecule
+			    F[two_i] += lj_scalar * dx;     	// pos account for the direction of the vector from base molecule
 			    F[two_i+1] += lj_scalar * dy;
 			    k++;
 			}  
 		    }
-		}  
+		} 
 	    }
-	    else if((myBlock%blockNum1D)==(blockNum1D-1)) 
+	    else if(myBlock==blockNum1D-1)
 	    {
-		// work as the rightmost column
-		for(r =(-1)*blockNum1D; r <= blockNum1D; r+=blockNum1D)
+		// for the left corner
+		for(r = 0; r <= blockNum1D; r+=blockNum1D)
 		{
-		    for(l=myBlock + r-1 ;l <= myBlock + r +1 ; l++)
+		    for(l=myBlock + r-1;l <= myBlock + r; l++)
 		    {
 			k = 0;
 			tmp = l * partsPerBlock;
@@ -311,239 +290,327 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
 			    dx = x[index] - x[two_i];
 			    dy = x[index+1] - x[two_i+1];
 			    lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
-			    F[two_i] += lj_scalar * dx;		// pos account for the direction of the vector from base molecule
+			    F[two_i] += lj_scalar * dx;     	// pos account for the direction of the vector from base molecule
 			    F[two_i+1] += lj_scalar * dy;
 			    k++;
 			}  
 		    }
-		}  
+		} 
 	    }
-	    else
-	    {
-		// work as a middle block
-		for(r =(-1)*blockNum1D; r <= blockNum1D; r+=blockNum1D)
-		{
-		    for(l=myBlock + r-1 ;l <= myBlock + r +1 ; l++)
-		    {
-			k = 0;
-			tmp = l * partsPerBlock;
-			while(adj[tmp+k]!=-1)
-			{
-			    index = tmp+k;
-			    dx = x[index] - x[two_i];
-			    dy = x[index+1] - x[two_i+1];
-			    lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
-			    F[two_i] += lj_scalar * dx;     	    // pos account for the direction of the vector from base molecule
-			    F[two_i+1] += lj_scalar * dy;
-			    k++;
-			}  
-		    }
-		}  
-	    }
-	}  
-    }
-}
-    int maxNumPartPerBlock(float blockSize, float sig)
-    {
-	return ((blockSize*blockSize)/(sig*sig));
-    }
-
-    void gridSort(int n, int numBlocks, int numPartsPerBox, int* adj, float* x)
-    {
-	float start = (BOX_SIZE/2.0)-BOX_SIZE;
-	float step = RCUT;                            // width of each block
-	int totBlocks = (int) GRID_NUM*GRID_NUM;       // blocks for both in the x and y directions
-	int cnt[totBlocks];                            // total # of blocks
-	float xblk, yblk;
-
-	int i,j,k,tmp;
-
-	memset(cnt,0,totBlocks * sizeof(int));
-
-	for(i=0;i<n;i++)                            // for each nbody
+	}
+	else if(myBlock > (blockNum1D*(blockNum1D-1)))
 	{
-	    /* Look over the X blocks */
-	    xblk = start;
-	    for(j=0; j<numBlocks; j++)
+	    // work as being on bottom row
+	    for(r =(-1)*blockNum1D; r <= 0; r+=blockNum1D)
 	    {
-		xblk+=step;
-		if(x[2*i] < xblk)
+		for(l=myBlock + r-1 ;l <= myBlock + r +1 ; l++)
 		{
-		    /* Look over the Y blocks */
-		    yblk = start;
-		    for(k=0; k < numBlocks; k++)
+		    k = 0;
+		    tmp = l * partsPerBlock;
+		    while(adj[tmp+k]!=-1)
 		    {
-			yblk+=step;
+			index = tmp+k;
+			dx = x[index] - x[two_i];
+			dy = x[index+1] - x[two_i+1];
+			lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
+			F[two_i] += lj_scalar * dx;     	    // pos account for the direction of the vector from base molecule
+			F[two_i+1] += lj_scalar * dy;
+			k++;
+		    }  
+		}
+	    }  
+	}
+	else if(!(myBlock%blockNum1D)) 
+	{
+	    // work as the leftmost column
+	    for(r =(-1)*blockNum1D; r <= blockNum1D; r+=blockNum1D)
+	    {
+		for(l=myBlock + r;l <= myBlock + r +1 ; l++)
+		{
+		    k = 0;
+		    tmp = l * partsPerBlock;
+		    while(adj[tmp+k]!=-1)
+		    {
+			index = tmp+k;
+			dx = x[index] - x[two_i];
+			dy = x[index+1] - x[two_i+1];
+			lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
+			F[two_i] += lj_scalar * dx;		// pos account for the direction of the vector from base molecule
+			F[two_i+1] += lj_scalar * dy;
+			k++;
+		    }  
+		}
+	    }  
+	}
+	else if((myBlock%blockNum1D)==(blockNum1D-1)) 
+	{
+	    // work as the rightmost column
+	    for(r =(-1)*blockNum1D; r <= blockNum1D; r+=blockNum1D)
+	    {
+		for(l=myBlock + r-1 ;l <= myBlock + r +1 ; l++)
+		{
+		    k = 0;
+		    tmp = l * partsPerBlock;
+		    while(adj[tmp+k]!=-1)
+		    {
+			index = tmp+k;
+			dx = x[index] - x[two_i];
+			dy = x[index+1] - x[two_i+1];
+			lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
+			F[two_i] += lj_scalar * dx;		// pos account for the direction of the vector from base molecule
+			F[two_i+1] += lj_scalar * dy;
+			k++;
+		    }  
+		}
+	    }  
+	}
+    }
 
-			/* Execute only if in this X,Y blocks */
-			if(x[2*i+1] < yblk)
-			{
-			    tmp = cnt[j+k*numBlocks]++;
-			    //printf("j: %d, k: %d, Block: %d, ActualMap: %d\n",j,k, j+k*numBlocks,(j+k*numBlocks)*numPartsPerBox+tmp);
-			    adj[(j+k*numBlocks)*numPartsPerBox+tmp] = 2*i;
-
-			    //printf("(%d,%d) ",(j+k*numB) ,2*i);
-			    break;
-			}
-		    }
+else
+{
+    // work as a middle block
+    for(r =(-1)*blockNum1D; r <= blockNum1D; r+=blockNum1D)
+    {
+	for(l=myBlock + r-1 ;l <= myBlock + r +1 ; l++)
+	{
+	    k = 0;
+	    tmp = l * partsPerBlock;
+	    for(k = 0; k < 6; k++)
+	    {
+		if(adj[tmp+k]!=-1)
+		{
+		    index = tmp+k;
+		    dx = x[index] - x[two_i];
+		    dy = x[index+1] - x[two_i+1];
+		    lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
+		    F[two_i] += lj_scalar * dx;     	    // pos account for the direction of the vector from base molecule
+		    F[two_i+1] += lj_scalar * dy;
+		    k++;
+		}  
+		else
+		{
 		    break;
 		}
 	    }
+	} 
+    } 
+
+}  
+
+}
+int maxNumPartPerBlock(float blockSize, float sig)
+{
+    return ((blockSize*blockSize)/(sig*sig));
+}
+
+void gridSort(int n, int numBlocks, int numPartsPerBox, int* adj, float* x)
+{
+    float start = (BOX_SIZE/2.0)-BOX_SIZE;
+    float step = RCUT;                            // width of each block
+    int totBlocks = (int) GRID_NUM*GRID_NUM;       // blocks for both in the x and y directions
+    int cnt[totBlocks];                            // total # of blocks
+    float xblk, yblk;
+
+    int i,j,k,tmp;
+
+    memset(cnt,0,totBlocks * sizeof(int));
+
+    for(i=0;i<n;i++)                            // for each nbody
+    {
+	/* Look over the X blocks */
+	xblk = start;
+	for(j=0; j<numBlocks; j++)
+	{
+	    xblk+=step;
+	    if(x[2*i] < xblk)
+	    {
+		/* Look over the Y blocks */
+		yblk = start;
+		for(k=0; k < numBlocks; k++)
+		{
+		    yblk+=step;
+
+		    /* Execute only if in this X,Y blocks */
+		    if(x[2*i+1] < yblk)
+		    {
+			tmp = cnt[j+k*numBlocks]++;
+			//printf("j: %d, k: %d, Block: %d, ActualMap: %d\n",j,k, j+k*numBlocks,(j+k*numBlocks)*numPartsPerBox+tmp);
+			adj[(j+k*numBlocks)*numPartsPerBox+tmp] = 2*i;
+
+			//printf("(%d,%d) ",(j+k*numB) ,2*i);
+			break;
+		    }
+		}
+		break;
+	    }
 	}
     }
+}
 
-    int getMyBlock(int id, int* adj, int numPartsPerBox)
+int getMyBlock(int n, int id, int* adj, int numPartsPerBox)
+{
+    int i = 0;
+    int tmp = n*numPartsPerBox;
+    for(i=0;i<tmp;i++)
     {
-	int i = 0;
-	while(adj[i]!=id)
+	if(adj[i]==id)
 	{
-	    i++;
+	    break;
 	}
-	return i/numPartsPerBox;
+    }
+    return i/numPartsPerBox;
+}
+
+// need to edit the main such that we iterate over the particles that are nearest to
+// particle of interest. We are using a cut off value to determine this. Need to write
+// a function to allow us to iterate over the nearby elements.
+
+
+int main(int argc, char** argv)
+{
+    //printf("%f\n",GRID_NUM);
+    struct timespec diff(struct timespec start, struct timespec end);
+    struct timespec time1, time2;
+    struct timespec time_stamp;
+
+
+    int npart,i,j,Num;
+
+    params param;
+    mols mol;
+    adjacent adj;
+
+    param.npart = N_BODY_NUM;
+    param.dt = DT;
+    param.eps_lj = EPS;
+    param.sig_lj = SIG;
+
+    mol.x = malloc(2*param.npart * sizeof(float));
+    mol.v = malloc(2*param.npart * sizeof(float));
+    mol.a = malloc(2*param.npart * sizeof(float));
+    mol.F = malloc(2*param.npart * sizeof(float));
+
+    double Blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
+    printf("Blength: %lf\n",Blength);
+    Num = maxNumPartPerBlock(Blength,SIG);
+    if(N_BODY_NUM < Num)
+    {
+	Num = N_BODY_NUM;
     }
 
-    // need to edit the main such that we iterate over the particles that are nearest to
-    // particle of interest. We are using a cut off value to determine this. Need to write
-    // a function to allow us to iterate over the nearby elements.
+    adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num);
+    memset(adj.n,-1,sizeof(int) * GRID_NUM * GRID_NUM *  Num);
+    printf("Num: %d\n",Num);
 
-
-    int main(int argc, char** argv)
+    npart = init_particles(param.npart, mol.x , mol.v, &param);
+    if(npart < param.npart)
     {
-	//printf("%f\n",GRID_NUM);
-	struct timespec diff(struct timespec start, struct timespec end);
-	struct timespec time1, time2;
-	struct timespec time_stamp;
+	fprintf(stderr, "Could not generate %d particles, Trying %d particles instead\n",param.npart,npart);
+	param.npart = npart;
+    }
 
+    init_particles_va( param.npart, mol.v,mol.a, &param);
 
-	int npart,i,j,Num;
+    printf("Before gridSort\n");
+    gridSort(npart, GRID_NUM, Num, adj.n, mol.x);
+    printf("After gridSort\n");
 
-	params param;
-	mols mol;
-	adjacent adj;
+    /*for(i=0;i<npart;i++)
+      printf("myBlockNum: %d\n",getMyBlock(param.npart,2*i, adj.n, Num/2));
 
-	param.npart = N_BODY_NUM;
-	param.dt = DT;
-	param.eps_lj = EPS;
-	param.sig_lj = SIG;
-
-	mol.x = malloc(2*param.npart * sizeof(float));
-	mol.v = malloc(2*param.npart * sizeof(float));
-	mol.a = malloc(2*param.npart * sizeof(float));
-	mol.F = malloc(2*param.npart * sizeof(float));
-
-	double Blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
-	Num = maxNumPartPerBlock(RCUT,SIG);
-	if(N_BODY_NUM < Num)
-	{
-	    Num = N_BODY_NUM;
-	}
-
-	adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num/2);
-	memset(adj.n,-1,sizeof(int) * GRID_NUM * GRID_NUM * Num/2);
-
-	npart = init_particles(param.npart, mol.x , mol.v, &param);
-	if(npart < param.npart)
-	{
-	    fprintf(stderr, "Could not generate %d particles, Trying %d particles instead\n",param.npart,npart);
-	    param.npart = npart;
-	}
-
-	init_particles_va( param.npart, mol.v,mol.a, &param);
-	gridSort(npart, GRID_NUM, Num/2, adj.n, mol.x);
-	/*for(i=0;i<npart;i++)
-	  printf("myBlockNum: %d\n",getMyBlock(2*i, adj.n, Num/2));
-
-	  for(i=0; i < param.npart; i++)
-	  {
-	  printf("nBody-Num: %d Posx: %f Velx: %f Accx: %f Forcex: %f\n",i,
-	  mol.x[2*i],mol.v[2*i],mol.a[2*i],mol.F[2*i]);
-	  printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
-	  mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
-	  }
-	 */
+      for(i=0; i < param.npart; i++)
+      {
+      printf("nBody-Num: %d Posx: %f Velx: %f Accx: %f Forcex: %f\n",i,
+      mol.x[2*i],mol.v[2*i],mol.a[2*i],mol.F[2*i]);
+      printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
+      mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
+      }
+     */
 
 #if(LINUX)
 
-	clock_gettime(CLOCK_REALTIME, &time1);
+    clock_gettime(CLOCK_REALTIME, &time1);
 
 #endif
 
-	compute_forces(param.npart,mol.x,mol.F);
-	for(i=0;i<ITERS;i++)
-	{
-	    gridSort(npart, GRID_NUM, Num/2, adj.n, mol.x);		    // Added in the gridSort function for each iteration
-	    verletInt1(param.npart,param.dt , mol.x, mol.v,mol.a);
-	    box_reflect(param.npart,mol.x,mol.v,mol.a );
+    //compute_forces(param.npart,mol.x,mol.F);
+    compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM,4*Num);
+    printf("After ComputeForces\n");
+    for(i=0;i<ITERS;i++)
+    {
+	gridSort(npart, GRID_NUM, Num, adj.n, mol.x);		    // Added in the gridSort function for each iteration
+	verletInt1(param.npart,param.dt , mol.x, mol.v,mol.a);
+	box_reflect(param.npart,mol.x,mol.v,mol.a );
 
-	    compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num/2);
-	    compute_forces(param.npart,mol.x,mol.F);
-	    verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
-	    memset(mol.F, 0 , 2*param.npart * sizeof(float));
-	}
+	compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
+	//compute_forces(param.npart,mol.x,mol.F);
+	verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
+	memset(mol.F, 0 , 2*param.npart * sizeof(float));
+    }
 
 #if(LINUX)
 
-	clock_gettime(CLOCK_REALTIME, &time2);
+    clock_gettime(CLOCK_REALTIME, &time2);
 
 #endif
 
-	/*
-	   for(i=0; i < param.npart; i++)
-	   {
-	   printf("nBody-Num: %d Posx: %f Velx: %f Accx: %f Forcex: %f\n",i,
-	   mol.x[2*i],mol.v[2*i],mol.a[2*i],mol.F[2*i]);
-	   printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
-	   mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
-	   }
-	 */
+    /*
+       for(i=0; i < param.npart; i++)
+       {
+       printf("nBody-Num: %d Posx: %f Velx: %f Accx: %f Forcex: %f\n",i,
+       mol.x[2*i],mol.v[2*i],mol.a[2*i],mol.F[2*i]);
+       printf("nBody-Num: %d Posy: %f Vely: %f Accy: %f Forcey: %f\n",i,
+       mol.x[2*i+1],mol.v[2*i+1],mol.a[2*i+1],mol.F[2*i+1]);
+       }
+     */
 
 #if(LINUX)
 
-	double blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
-	printf("Boxsize: %lf,Blocksize: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,blength, maxNumPartPerBlock(blength,SIG));
-	time_stamp = diff(time1,time2);
-	printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
+    double blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
+    printf("Boxsize: %lf,Blocksize: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,blength, maxNumPartPerBlock(blength,SIG));
+    time_stamp = diff(time1,time2);
+    printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
 
 #else
 
-	printf("Boxsize: %lf,BlockNum: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,GRID_NUM, maxNumPartPerBlock(GRID_NUM,SIG));
+    printf("Boxsize: %lf,BlockNum: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,GRID_NUM, maxNumPartPerBlock(GRID_NUM,SIG));
 
 #endif
 
-	/*        // test statements for the grid allocation
-		  int count =0;
-		  for(i=0;i<GRID_NUM*GRID_NUM*Num/2;i++)
-		  {
-		  if(adj.n[i]!=-1)
-		  {
-		  count++;
-		  }
-		  }
-		  printf("%d\n",count);
+    /*        // test statements for the grid allocation
+	      int count =0;
+	      for(i=0;i<GRID_NUM*GRID_NUM*Num/2;i++)
+	      {
+	      if(adj.n[i]!=-1)
+	      {
+	      count++;
+	      }
+	      }
+	      printf("%d\n",count);
 
-	 */
+     */
 
-	free(adj.n);
-	free(mol.x);
-	free(mol.v);
-	free(mol.a);
-	free(mol.F);
-	printf("Done\n");
+    free(adj.n);
+    free(mol.x);
+    free(mol.v);
+    free(mol.a);
+    free(mol.F);
+    printf("Done\n");
 
-	return 0;
+    return 0;
+}
+
+struct timespec diff(struct timespec start, struct timespec end)
+{
+    struct timespec temp;
+    if ((end.tv_nsec-start.tv_nsec)<0) {
+	temp.tv_sec = end.tv_sec-start.tv_sec-1;
+	temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+    } else {
+	temp.tv_sec = end.tv_sec-start.tv_sec;
+	temp.tv_nsec = end.tv_nsec-start.tv_nsec;
     }
-
-    struct timespec diff(struct timespec start, struct timespec end)
-    {
-	struct timespec temp;
-	if ((end.tv_nsec-start.tv_nsec)<0) {
-	    temp.tv_sec = end.tv_sec-start.tv_sec-1;
-	    temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
-	} else {
-	    temp.tv_sec = end.tv_sec-start.tv_sec;
-	    temp.tv_nsec = end.tv_nsec-start.tv_nsec;
-	}
-	return temp;
-    }
+    return temp;
+}
 
 
