@@ -15,11 +15,11 @@
 #include <errno.h>
 #include <string.h>
 
-#define LINUX       0
+#define LINUX       1
 
 #define EPS	      1
 #define SIG	      1e-2
-#define CUT	      2
+#define CUT	      2.5
 #define RCUT	      (CUT*SIG)
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
@@ -32,11 +32,11 @@
 #define T0	          1
 #define MAX_TRIALS    10
 #define ITERS         100
-#define BOX_SIZE      1.0
+#define BOX_SIZE      10.0
 #define GRID_NUM      ((BOX_SIZE)/(RCUT))
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
-
+#define EST_NUM(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/(GRID_NUM*GRID_NUM))
 
 
 typedef float data_t;
@@ -584,11 +584,19 @@ int main(int argc, char** argv)
 
   double Blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
   printf("Blength: %lf\n",Blength);
-  Num = maxNumPartPerBlock(Blength,SIG);
+  Num = EST_NUM(GRID_NUM,N_BODY_NUM);
+  Num = 4*Num;
+  if(!Num)
+  {
+     Num = 4;
+  }
+  
   if(N_BODY_NUM < Num)
   {
     Num = N_BODY_NUM;
   }
+
+    //int gNum = GRID_NUM;
 
   adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num);
   memset(adj.n,-1,sizeof(int) * GRID_NUM * GRID_NUM *  Num);
@@ -626,7 +634,7 @@ int main(int argc, char** argv)
 #endif
 
   //compute_forces(param.npart,mol.x,mol.F);
-  compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM,4*Num);
+  compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
   printf("After ComputeForces\n");
   for(i=0;i<ITERS;i++)
   {
@@ -635,7 +643,7 @@ int main(int argc, char** argv)
     box_reflect(param.npart,mol.x,mol.v,mol.a );
 
     compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
-    //compute_forces(param.npart,mol.x,mol.F);
+//    compute_forces(param.npart,mol.x,mol.F);
     verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
     memset(mol.F, 0 , 2*param.npart * sizeof(float));
   }
