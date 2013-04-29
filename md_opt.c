@@ -41,9 +41,6 @@
 #define EST_NUM(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/(GRID_NUM*GRID_NUM))
 
 
-int getMyBlock(int n, int id, int* adj, int numPartsPerBox);
-
-
 typedef float data_t;
 
 typedef struct sim_param_t {
