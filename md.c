@@ -15,7 +15,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define LINUX       1
+#define LINUX       0
 
 #define EPS	      1
 #define SIG	      1e-2
@@ -37,6 +37,9 @@
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
 #define EST_NUM(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/(GRID_NUM*GRID_NUM))
+
+
+int getMyBlock(int n, int id, int* adj, int numPartsPerBox);
 
 
 typedef float data_t;
