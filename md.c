@@ -15,13 +15,13 @@
 #include <errno.h>
 #include <string.h>
 
-#define LINUX       1			    // is this on a linux machine??
-#define NEAREST	    1                       // Are we going to use nearest algorithm
+#define LINUX       0			    // is this on a linux machine??
+#define NEAREST	    0                       // Are we going to use nearest algorithm
 #define OPT	    0                       // N^2 or optimized code??
 
 #define EPS	      1
 #define SIG	      1e-2
-#define CUT	      3
+#define CUT	      2.5
 #define RCUT	      (CUT*SIG)
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
@@ -34,17 +34,15 @@
 #define T0	          1
 #define MAX_TRIALS    10
 #define ITERS         100
-#define BOX_SIZE      10.0
+#define BOX_SIZE      1.0
 #define GRID_NUM      ((BOX_SIZE)/(RCUT))
+
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
 #define EST_NUM(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/(GRID_NUM*GRID_NUM))
 
 
 int getMyBlock(int n, int id, int* adj, int numPartsPerBox);
-
-
-typedef float data_t;
 
 typedef struct sim_param_t {
   int npart;
@@ -212,8 +210,6 @@ void compute_forces_naive(int n, float* x, float* F)
       lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
       F[2*i] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
       F[2*i+1] += lj_scalar * dy;
-      //F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
-      //F[2*j+1] -= lj_scalar * dy;            // only applies in the non naive serial version
        }
     }
   }
@@ -231,7 +227,6 @@ void compute_forces(int n, float* x, float* F)
   {
     for(j = i+1; j < n; j++)
     {
-      // if(i!=j){
       dx = x[2*j] - x[2*i];
       dy = x[2*j+1] - x[2*i+1];
       lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
@@ -239,7 +234,6 @@ void compute_forces(int n, float* x, float* F)
       F[2*i+1] += lj_scalar * dy;
       F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
       F[2*j+1] -= lj_scalar * dy;            // used in the non naive serial method 
-      // }
     }
   }
 }
@@ -565,8 +559,6 @@ void gridSort(int n, int numBlocks, int numPartsPerBox, int* adj, float* x)
             tmp = cnt[j+k*numBlocks]++;
             //printf("j: %d, k: %d, Block: %d, ActualMap: %d\n",j,k, j+k*numBlocks,(j+k*numBlocks)*numPartsPerBox+tmp);
             adj[(j+k*numBlocks)*numPartsPerBox+tmp] = 2*i;
-
-            //printf("(%d,%d) ",(j+k*numB) ,2*i);
             break;
           }
         }
@@ -592,7 +584,30 @@ int getMyBlock(int n, int id, int* adj, int numPartsPerBox)
 
 int main(int argc, char** argv)
 {
-  //printf("%f\n",GRID_NUM);
+  int size = 0;
+  int opt = 0;
+  int near = 0;
+
+  if(argc==2)
+  {
+    if(argv[1]=="-serial")
+    {
+      opt = 0;
+      near = 0;
+    }
+    if(argv[1]=="-opt")
+    {
+      opt = 1;
+      near = 0;
+    }
+    if(argv[1]=="-near")
+    {
+      opt = 0;
+      near = 1;
+    }
+    size = atoi(argv[2]);
+  }
+  
   struct timespec diff(struct timespec start, struct timespec end);
   struct timespec time1, time2;
   struct timespec time_stamp;
@@ -603,8 +618,12 @@ int main(int argc, char** argv)
   params param;
   mols mol;
   adjacent adj;
-
   param.npart = N_BODY_NUM;
+
+ if(size!=0)
+{
+  param.npart = size;
+}
   param.dt = DT;
   param.eps_lj = EPS;
   param.sig_lj = SIG;
@@ -613,26 +632,26 @@ int main(int argc, char** argv)
   mol.v = malloc(2*param.npart * sizeof(float));
   mol.a = malloc(2*param.npart * sizeof(float));
   mol.F = malloc(2*param.npart * sizeof(float));
-#if (NEAREST)
+//#if (NEAREST)
+if(near){
   double Blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
   printf("Blength: %lf\n",Blength);
-  Num = EST_NUM(GRID_NUM,N_BODY_NUM);
+  Num = EST_NUM(GRID_NUM,size);
   Num = 4*Num;
   if(!Num)
   {
      Num = 4;
   }
-  
-  if(N_BODY_NUM < Num)
+  if(size < Num)
   {
-    Num = N_BODY_NUM;
+    Num = size;
   }
 
   adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num);
   memset(adj.n,-1,sizeof(int) * GRID_NUM * GRID_NUM *  Num);
   printf("Num: %d\n",Num);
-#endif
-
+//#endif
+}
   npart = init_particles(param.npart, mol.x , mol.v, &param);
   if(npart < param.npart)
   {
@@ -646,12 +665,14 @@ int main(int argc, char** argv)
 
   init_particles_va( param.npart, mol.v,mol.a, &param);
 
-#if(NEAREST)
+//#if(NEAREST)
+if(near)
+{
   printf("Before gridSort\n");
   gridSort(npart, GRID_NUM, Num, adj.n, mol.x);
   printf("After gridSort\n");
-#endif
-
+//#endif
+  }
   /*for(i=0;i<npart;i++)
     printf("myBlockNum: %d\n",getMyBlock(param.npart,2*i, adj.n, Num/2));
 
@@ -669,30 +690,39 @@ int main(int argc, char** argv)
   clock_gettime(CLOCK_REALTIME, &time1);
 
 #endif
-#if(NEAREST)
+//#if(NEAREST)
+if(near){
   compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
-
-#elif(OPT)  
+}else if(opt){
+//#elif(OPT)  
   compute_forces(param.npart,mol.x,mol.F);
-#else
+//#else
+}else{
     compute_forces_naive(param.npart,mol.x,mol.F);
 
-#endif
+//#endif
+}
   printf("After First ComputeForces\n");
   for(i=0;i<ITERS;i++)
   {
-#if(NEAREST)
+//#if(NEAREST)
+if(near){
     gridSort(npart, GRID_NUM, Num, adj.n, mol.x);		    // Added in the gridSort function for each iteration
-#endif
+}
+//#endif
     verletInt1(param.npart,param.dt , mol.x, mol.v,mol.a);
     box_reflect(param.npart,mol.x,mol.v,mol.a );
-#if(NEAREST)
+//#if(NEAREST)
+if(near){
     compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
-#elif(OPT)
+//#elif(OPT)
+}else if(opt){
     compute_forces(param.npart,mol.x,mol.F);
-#else
+//#else
+}else{
     compute_forces_naive(param.npart,mol.x,mol.F);
-#endif
+//#endif
+}
     verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
     memset(mol.F, 0 , 2*param.npart * sizeof(float));
   }
