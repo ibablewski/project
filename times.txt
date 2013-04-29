@@ -1,0 +1,123 @@
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Blength: 0.025000
+Num: 4
+Generated 1000 particles
+Before gridSort
+After gridSort
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.025000,MaxBodiesPerBlock: 6
+Execution time: 2.721101
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Blength: 0.025000
+Num: 4
+Generated 1000 particles
+Before gridSort
+After gridSort
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.025000,MaxBodiesPerBlock: 6
+Execution time: 2.727193
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Generated 1000 particles
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.025000,MaxBodiesPerBlock: 6
+Execution time: 3.705557
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Generated 1000 particles
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 3.664165
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Blength: 0.030000
+Num: 4
+Generated 1000 particles
+Before gridSort
+After gridSort
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 2.669716
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Blength: 0.030000
+Num: 4
+Generated 5000 particles
+Before gridSort
+After gridSort
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 60.924015
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Generated 5000 particles
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 90.849638
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Generated 5000 particles
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 1.383497
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Blength: 0.030000
+Num: 4
+Generated 5000 particles
+Before gridSort
+After gridSort
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 1.195192
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Blength: 0.030000
+Num: 4
+Generated 10000 particles
+Before gridSort
+After gridSort
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 4.662730
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Generated 10000 particles
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 5.564693
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Generated 100000 particles
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 562.497100
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gcc md.c -o test -lrt -lm -g
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ ./test
+Blength: 0.030000
+Num: 4
+Generated 100000 particles
+Before gridSort
+After gridSort
+After ComputeForces
+Boxsize: 10.000000,Blocksize: 0.030000,MaxBodiesPerBlock: 9
+Execution time: 279.447590
+Done
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ gvim times.txt
+icb@enggrid1 ~/Desktop/EC527/project.git/project $ 
+

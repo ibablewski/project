@@ -15,11 +15,13 @@
 #include <errno.h>
 #include <string.h>
 
-#define LINUX       1
+#define LINUX       1			    // is this on a linux machine??
+#define NEAREST	    1                       // Are we going to use nearest algorithm
+#define OPT	    0                       // N^2 or optimized code??
 
 #define EPS	      1
 #define SIG	      1e-2
-#define CUT	      2.5
+#define CUT	      3
 #define RCUT	      (CUT*SIG)
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
@@ -188,7 +190,31 @@ void box_reflect(int n, float* x, float* v, float* a)
     if(x[2*i+1] > YMAX) reflect(YMAX,&x[2*i+1],&v[2*i+1],&a[2*i+1]);
   }
 }
+ 
+void compute_forces_naive(int n, float* x, float* F)
+{
+  int i,j;
+  float eps = EPS;
+  float sig = SIG;
+  float sig2 = sig*sig;
+  float dx,dy,lj_scalar;
 
+  for(i = 0; i < n; i++)
+  {
+    for(j = 0; j < n; j++)
+    {
+       if(i!=j){
+      dx = x[2*j] - x[2*i];
+      dy = x[2*j+1] - x[2*i+1];
+      lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
+      F[2*i] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
+      F[2*i+1] += lj_scalar * dy;
+      //F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
+      //F[2*j+1] -= lj_scalar * dy;            // only applies in the non naive serial version
+       }
+    }
+  }
+} 
 
 void compute_forces(int n, float* x, float* F)
 {
@@ -208,8 +234,8 @@ void compute_forces(int n, float* x, float* F)
       lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
       F[2*i] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
       F[2*i+1] += lj_scalar * dy;
-      //F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
-      //F[2*j+1] -= lj_scalar * dy;
+      F[2*j] -= lj_scalar * dx;              // neg account for the direction of the vector from non-base molecule
+      F[2*j+1] -= lj_scalar * dy;            // used in the non naive serial method 
       // }
     }
   }
@@ -259,6 +285,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
             }
           }
         }
+
         if(myBlock==0)
         {
           // for the left corner
@@ -287,6 +314,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
             }
           } 
         }
+
         else if(myBlock==blockNum1D-1)
         {
           // for the right top corner
@@ -317,6 +345,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
         }
       }
     }
+
     else if(myBlock >= (blockNum1D*(blockNum1D-1)))
     {
       // bottom left corner
@@ -347,6 +376,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
           }
         }
       }
+
       else if(myBlock==(blockNum1D*blockNum1D-1))
       {
         // bottom right corner
@@ -375,6 +405,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
           }
         }
       }
+
       else{
         // work as being on bottom row
         for(r =(-1)*blockNum1D; r <= 0; r+=blockNum1D)
@@ -403,6 +434,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
         }
       }  
     }
+
     else if(!(myBlock%blockNum1D)) 
     {
       // work as the leftmost column
@@ -431,6 +463,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
         }
       }  
     }
+
     else if((myBlock%blockNum1D)==(blockNum1D-1)) 
     {
       // work as the rightmost column
@@ -459,6 +492,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
         }
       }  
     }
+
     else
     {
       // work as a middle block
@@ -553,11 +587,6 @@ int getMyBlock(int n, int id, int* adj, int numPartsPerBox)
   return i/numPartsPerBox;
 }
 
-// need to edit the main such that we iterate over the particles that are nearest to
-// particle of interest. We are using a cut off value to determine this. Need to write
-// a function to allow us to iterate over the nearby elements.
-
-
 int main(int argc, char** argv)
 {
   //printf("%f\n",GRID_NUM);
@@ -581,7 +610,7 @@ int main(int argc, char** argv)
   mol.v = malloc(2*param.npart * sizeof(float));
   mol.a = malloc(2*param.npart * sizeof(float));
   mol.F = malloc(2*param.npart * sizeof(float));
-
+#if (NEAREST)
   double Blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
   printf("Blength: %lf\n",Blength);
   Num = EST_NUM(GRID_NUM,N_BODY_NUM);
@@ -596,11 +625,10 @@ int main(int argc, char** argv)
     Num = N_BODY_NUM;
   }
 
-    //int gNum = GRID_NUM;
-
   adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num);
   memset(adj.n,-1,sizeof(int) * GRID_NUM * GRID_NUM *  Num);
   printf("Num: %d\n",Num);
+#endif
 
   npart = init_particles(param.npart, mol.x , mol.v, &param);
   if(npart < param.npart)
@@ -608,12 +636,18 @@ int main(int argc, char** argv)
     fprintf(stderr, "Could not generate %d particles, Trying %d particles instead\n",param.npart,npart);
     param.npart = npart;
   }
+  else
+  {
+    fprintf(stdout,"Generated %d particles\n",param.npart);
+  }
 
   init_particles_va( param.npart, mol.v,mol.a, &param);
 
+#if(NEAREST)
   printf("Before gridSort\n");
   gridSort(npart, GRID_NUM, Num, adj.n, mol.x);
   printf("After gridSort\n");
+#endif
 
   /*for(i=0;i<npart;i++)
     printf("myBlockNum: %d\n",getMyBlock(param.npart,2*i, adj.n, Num/2));
@@ -632,18 +666,30 @@ int main(int argc, char** argv)
   clock_gettime(CLOCK_REALTIME, &time1);
 
 #endif
-
-  //compute_forces(param.npart,mol.x,mol.F);
+#if(NEAREST)
   compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
-  printf("After ComputeForces\n");
+
+#elif(OPT)  
+  compute_forces(param.npart,mol.x,mol.F);
+#else
+    compute_forces_naive(param.npart,mol.x,mol.F);
+
+#endif
+  printf("After First ComputeForces\n");
   for(i=0;i<ITERS;i++)
   {
+#if(NEAREST)
     gridSort(npart, GRID_NUM, Num, adj.n, mol.x);		    // Added in the gridSort function for each iteration
+#endif
     verletInt1(param.npart,param.dt , mol.x, mol.v,mol.a);
     box_reflect(param.npart,mol.x,mol.v,mol.a );
-
+#if(NEAREST)
     compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
-//    compute_forces(param.npart,mol.x,mol.F);
+#elif(OPT)
+    compute_forces(param.npart,mol.x,mol.F);
+#else
+    compute_forces_naive(param.npart,mol.x,mol.F);
+#endif
     verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
     memset(mol.F, 0 , 2*param.npart * sizeof(float));
   }
@@ -689,8 +735,9 @@ int main(int argc, char** argv)
             printf("%d\n",count);
 
 */
-
+#if(NEAREST)
   free(adj.n);
+#endif
   free(mol.x);
   free(mol.v);
   free(mol.a);
