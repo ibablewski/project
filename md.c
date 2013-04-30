@@ -15,7 +15,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define LINUX       0			    // is this on a linux machine??
+#define LINUX       1			    // is this on a linux machine??
 #define NEAREST	    0                       // Are we going to use nearest algorithm
 #define OPT	    0                       // N^2 or optimized code??
 
@@ -25,14 +25,14 @@
 #define RCUT	      (CUT*SIG)
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
-#define DT	      0.0001           //  0.001 second time increments
+#define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
 #define N_BODY_NUM    1000
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
 #define YMIN	      -(BOX_SIZE/2.0)
 #define T0	          1
-#define MAX_TRIALS    10
+#define MAX_TRIALS    100
 #define ITERS         100
 #define BOX_SIZE      1.0
 #define GRID_NUM      ((BOX_SIZE)/(RCUT))
@@ -582,25 +582,30 @@ int getMyBlock(int n, int id, int* adj, int numPartsPerBox)
   return i/numPartsPerBox;
 }
 
+/************** Main Function *************************/
+
 int main(int argc, char** argv)
 {
+
   int size = 0;
+  //  for(size=0;size<argc;size++)
+    //        printf("%s, %d\n",argv[size],size);
   int opt = 0;
   int near = 0;
 
-  if(argc==2)
+  if(argc==3)
   {
-    if(argv[1]=="-serial")
+    if(!strcmp(argv[1],"s"))
     {
       opt = 0;
       near = 0;
     }
-    if(argv[1]=="-opt")
+    if(!strcmp(argv[1],"o"))
     {
       opt = 1;
       near = 0;
     }
-    if(argv[1]=="-near")
+    if(!strcmp(argv[1],"n"))
     {
       opt = 0;
       near = 1;
@@ -620,7 +625,7 @@ int main(int argc, char** argv)
   adjacent adj;
   param.npart = N_BODY_NUM;
 
- if(size!=0)
+ if(size> 0)
 {
   param.npart = size;
 }
@@ -635,7 +640,7 @@ int main(int argc, char** argv)
 //#if (NEAREST)
 if(near){
   double Blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
-  printf("Blength: %lf\n",Blength);
+  //printf("Blength: %lf\n",Blength);
   Num = EST_NUM(GRID_NUM,size);
   Num = 4*Num;
   if(!Num)
@@ -649,18 +654,18 @@ if(near){
 
   adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num);
   memset(adj.n,-1,sizeof(int) * GRID_NUM * GRID_NUM *  Num);
-  printf("Num: %d\n",Num);
+  //printf("Num: %d\n",Num);
 //#endif
 }
   npart = init_particles(param.npart, mol.x , mol.v, &param);
   if(npart < param.npart)
   {
-    fprintf(stderr, "Could not generate %d particles, Trying %d particles instead\n",param.npart,npart);
+   // fprintf(stderr, "Could not generate %d particles, Trying %d particles instead\n",param.npart,npart);
     param.npart = npart;
   }
   else
   {
-    fprintf(stdout,"Generated %d particles\n",param.npart);
+    //fprintf(stdout,"Generated %d particles\n",param.npart);
   }
 
   init_particles_va( param.npart, mol.v,mol.a, &param);
@@ -668,9 +673,9 @@ if(near){
 //#if(NEAREST)
 if(near)
 {
-  printf("Before gridSort\n");
+  //printf("Before gridSort\n");
   gridSort(npart, GRID_NUM, Num, adj.n, mol.x);
-  printf("After gridSort\n");
+  //printf("After gridSort\n");
 //#endif
   }
   /*for(i=0;i<npart;i++)
@@ -702,7 +707,7 @@ if(near){
 
 //#endif
 }
-  printf("After First ComputeForces\n");
+  //printf("After First ComputeForces\n");
   for(i=0;i<ITERS;i++)
   {
 //#if(NEAREST)
@@ -746,14 +751,26 @@ if(near){
 #if(LINUX)
 
   double blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
-  printf("Boxsize: %lf,Blocksize: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,blength, maxNumPartPerBlock(blength,SIG));
   time_stamp = diff(time1,time2);
-  printf("Execution time: %lf\n",(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
+if(near){
+  printf("%s, %d, %lf\n","n",param.npart,(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
+}
+else if(opt)
+{
+  printf("%s, %d, %lf\n","o",param.npart,(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
+}
+else
+{
+  printf("%s, %d, %lf\n","s",param.npart,(double)((time_stamp.tv_sec + (time_stamp.tv_nsec/1.0e9))));
+}
 
 #else
-
-  printf("Boxsize: %lf,BlockNum: %lf,MaxBodiesPerBlock: %d\n",BOX_SIZE,GRID_NUM, maxNumPartPerBlock(GRID_NUM,SIG));
-
+if(near)
+printf("%s, %d\n","n",param.npart);
+else if(opt)
+printf("%s, %d\n","o",param.npart);
+else
+printf("%s, %d\n","s",param.npart);
 #endif
 
   /*        // test statements for the grid allocation
@@ -775,7 +792,7 @@ if(near){
   free(mol.v);
   free(mol.a);
   free(mol.F);
-  printf("Done\n");
+//  printf("Done\n");
 
   return 0;
 }
