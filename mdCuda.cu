@@ -35,6 +35,19 @@
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
 #define EST_NUM(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/(GRID_NUM*GRID_NUM))
 
+typedef struct sim_param_t {
+    int npart;
+    float dt;
+    float eps_lj;
+    float sig_lj;
+}params;
+
+typedef struct molecule_t {
+    float* x;
+    float* v;
+    float* a;
+    float* F;
+}mols; 
 
 __device__ void compute_forces_naive(int n, int k, float* x, float* F);
 __device__ void box_reflect(int n,int k, float* x, float* v, float* a);
@@ -42,60 +55,69 @@ __device__ void reflect(float wall, float* x, float* v, float* a);
 __device__ void verletInt2(int n,int k, float dt, float* x, float* v, float* a);	 
 __device__ float compute_LJ_Scalar(float r2, float eps, float sig2);
 __device__ void verletInt1(int n, int k, float dt, float* x, float* v, float* a);	    
+int init_particles(int n, float* x, float* v, params* param);
+void init_particles_va(int n, float* v,float* a, params* param);
 
 // Just a prototype and declaration
 struct timespec diff(struct timespec start, struct timespec end);
 void cudaErrorCheck(cudaError_t err);
-//verlet1
-// boxreflect
-// computeforces
-// verlet2
 
 // computeforces kernel
-__global__ void kernel_MMM(float* x, float* v, float* a, float* F, int particles)
+__global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int particles)
 {
-    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    i = i/2;
 
-    int k = 0;
-    float = DT;
-    for(k = 0; k < particles; k++)
+    const int iter = ITERS;
+    int r,k = 0;
+    float dt = DT;
+    for(r=0; r < iter; r++)
     {
-
-	verletInt1(i, k, dt, x, v, a);
-	box_reflect(i, k, x, v, a);
-	compute_forces_naive(i, k, x, F);
-	verletInt2(i, k, dt, x, v, a);
-
+	for(k = 0; k < particles; k++)
+	{
+	    verletInt1(i, k, dt, x, v, a);
+	    box_reflect(i, k, x, v, a);
+	    compute_forces_naive(i, k, x, F);
+	    verletInt2(i, k, dt, x, v, a);
+	}
+	memset(F,0,2*particles*sizeof(float));
+	__syncthreads();
     }
 }
+
 
 int main(int argc, char **argv){
 
     struct timespec time1,time2;
     struct timespec time_stamp;
-    int arrLen = N_BODY_NUM;
-    size_t size = arrLen * arrLen * sizeof(float);
     cudaError_t err = cudaSuccess;
 
+    // start timing of entire program
+    clock_gettime(CLOCK_REALTIME, &time1);
     // Timing related variables
     float elapsed_gpu[2];
 
+    // global information
+    params param;
+    param.npart = N_BODY_NUM;
+    param.dt = DT;
+    param.eps_lj = EPS;
+    param.sig_lj = SIG;
+
+    // declare size in bytes
+    size_t size = 2 * param.npart * sizeof(float);
+
     // Arrays on GPU global memory
-    float *d_A;
-    float *d_B;
-    float *d_C;
+    mols d_mol;
 
     // Arrays on the host memory
-    float *h_A;
-    float *h_B;
-    float *h_C;
-    float *h_base;
+    mols h_mol;
 
     // Allocate arrays on host memory
-    h_A = (float *) malloc(size);
-    h_B = (float *) malloc(size);
-    h_C = (float *) malloc(size);
-    h_base = (float *) malloc(size);
+    h_mol.x = (float *) malloc(size);
+    h_mol.v = (float *) malloc(size);
+    h_mol.a = (float *) malloc(size);
+    h_mol.F = (float *) malloc(size);
 
     cudaEvent_t start1,stop1;
 
@@ -109,27 +131,39 @@ int main(int argc, char **argv){
     cudaErrorCheck(err);
 
     printf("About to cudaMalloc\n");
-    err = cudaMalloc((void**) &d_A, size);
+    err = cudaMalloc((void**) &d_mol.x, size);
     cudaErrorCheck(err);
 
-    err = cudaMalloc((void**) &d_B, size);
+    err = cudaMalloc((void**) &d_mol.v, size);
     cudaErrorCheck(err);
 
-    err = cudaMalloc((void**) &d_C, size);
+    err = cudaMalloc((void**) &d_mol.a, size);
     cudaErrorCheck(err);
+
+    err = cudaMalloc((void**) &d_mol.F, size);
+    cudaErrorCheck(err);
+
     printf("Finished the cudaMalloc\n");
 
     // Initialize the host arrays
-    printf("\nInitializing the arrays ...");
-    //initializeArray2D(h_A, arrLen, 2453);
-    //initializeArray2D(h_B, arrLen, 923874);
+    printf("\nInitializing the Particles ...");
+
+    param.npart = init_particles(param.npart, h_mol.x, h_mol.v, &param);
+    init_particles_va(param.npart, h_mol.v, h_mol.a, &param);
+
     printf("\t... done\n\n");
 
     // Transfer the arrays to the GPU memory
-    err = cudaMemcpy(d_A, h_A, size , cudaMemcpyHostToDevice);
+    err = cudaMemcpy(d_mol.x, h_mol.x, size , cudaMemcpyHostToDevice);
     cudaErrorCheck(err);
 
-    err = cudaMemcpy(d_B, h_B, size , cudaMemcpyHostToDevice);
+    err = cudaMemcpy(d_mol.v, h_mol.v, size , cudaMemcpyHostToDevice);
+    cudaErrorCheck(err);
+
+    err = cudaMemcpy(d_mol.a, h_mol.a, size , cudaMemcpyHostToDevice);
+    cudaErrorCheck(err);
+
+    err = cudaMemcpy(d_mol.F, h_mol.F, size , cudaMemcpyHostToDevice);
     cudaErrorCheck(err);
 
     // create timer and start the timer
@@ -147,13 +181,13 @@ int main(int argc, char **argv){
 
 
     /// gives the ceiling function for # of blocks  -->  Launch the kernel
-    int blocksPerGrid = (arrLen+15)/16;	
+    int blocksPerGrid = (param.npart+15)/16;	
     dim3 dimGrid(blocksPerGrid,blocksPerGrid);		
     dim3 dimBlock(16,16);
 
     // Generate actual cuda call
     printf("Making call to kernel\n");
-    kernel_MMM<<< dimGrid,dimBlock >>>(d_A,d_B,d_C,arrLen);
+    kernel_VanDerWaals<<< dimGrid,dimBlock >>>(h_mol.x, h_mol.v, h_mol.a, h_mol.F, param.npart);
 
     // Check if kernel execution generated an error
     err = cudaGetLastError();
@@ -162,7 +196,16 @@ int main(int argc, char **argv){
     // Transfer the results back to the host
     printf("Waiting for computation to complete...\n");
 
-    err = cudaMemcpy( h_C , d_C , size ,cudaMemcpyDeviceToHost);    
+    err = cudaMemcpy( h_mol.x , d_mol.x , size ,cudaMemcpyDeviceToHost);    
+    cudaErrorCheck(err);
+
+    err = cudaMemcpy( h_mol.v , d_mol.v , size ,cudaMemcpyDeviceToHost);    
+    cudaErrorCheck(err);
+
+    err = cudaMemcpy( h_mol.a , d_mol.a , size ,cudaMemcpyDeviceToHost);    
+    cudaErrorCheck(err);
+
+    err = cudaMemcpy( h_mol.F , d_mol.F , size ,cudaMemcpyDeviceToHost);    
     cudaErrorCheck(err);
 
     printf("Complete!\n");
@@ -206,7 +249,6 @@ int main(int argc, char **argv){
     err = cudaEventDestroy(stop1);
     cudaErrorCheck(err);
 
-    clock_gettime(CLOCK_REALTIME, &time1);
     clock_gettime(CLOCK_REALTIME, &time2);
     time_stamp = diff(time1,time2);
 
@@ -219,18 +261,23 @@ int main(int argc, char **argv){
 
 
 
-    err = cudaFree(d_A);
+
+    err = cudaFree(d_mol.x);
+    cudaErrorCheck(err);
+    err = cudaFree(d_mol.v);
+    cudaErrorCheck(err);
+    err = cudaFree(d_mol.a);
+    cudaErrorCheck(err);
+    err = cudaFree(d_mol.F);
     cudaErrorCheck(err);
 
-    err = cudaFree(d_B);
-    cudaErrorCheck(err);
 
-    err = cudaFree(d_C);
-    cudaErrorCheck(err);
 
-    free(h_A);
-    free(h_B);
-    free(h_C);
+
+    free(h_mol.x);
+    free(h_mol.v);
+    free(h_mol.a);
+    free(h_mol.F);
     printf("We actually did it! \n");
 
     return EXIT_SUCCESS;
@@ -258,25 +305,6 @@ void cudaErrorCheck(cudaError_t err)
 	exit(EXIT_FAILURE);
     }
 }
-
-typedef struct sim_param_t {
-    int npart;
-    float dt;
-    float eps_lj;
-    float sig_lj;
-} params;
-
-typedef struct molecule {
-    float* x;
-    float* v;
-    float* a;
-    float* F;
-}mols;
-
-typedef struct adjacents {
-    int* n;
-}adjacent;
-
 
 
 int init_particles(int n, float* x, float* v, params* param)
@@ -339,7 +367,7 @@ __device__ float compute_LJ_Scalar(float r2, float eps, float sig2)
 	float frac2 = sig2/r2;
 	float frac6 = frac2*frac2*frac2;
 	return 24.0*eps/r2 * frac6 *(1.0-2.0*frac6);		
-   }
+    }
     return 0;
 }
 
@@ -366,7 +394,7 @@ __device__ void verletInt2(int n,int k, float dt, float* x, float* v, float* a)
 // should check for reflection inbetween 
 __device__ void reflect(float wall, float* x, float* v, float* a)
 {
-    printf("reflected!");
+    //printf("reflected!");
     *x = (2*wall-(*x));
     *v = -(*v);
     *a = -(*a);
