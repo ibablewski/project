@@ -26,7 +26,7 @@
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
-#define N_BODY_NUM    1000
+#define N_BODY_NUM    10000
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -34,7 +34,7 @@
 #define T0	          1
 #define MAX_TRIALS    100
 #define ITERS         100
-#define BOX_SIZE      1.0
+#define BOX_SIZE      10.0
 #define GRID_NUM      ((BOX_SIZE)/(RCUT))
 
 
