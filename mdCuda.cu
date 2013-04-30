@@ -20,7 +20,7 @@
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
-#define N_BODY_NUM    1000
+#define N_BODY_NUM    10000
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -65,20 +65,22 @@ void cudaErrorCheck(cudaError_t err);
 // computeforces kernel
 __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int particles)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    i = i/2;
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     const int iter = ITERS;
-    int r,k = 0;
+    int r,k;
     float dt = DT;
     for(r=0; r < iter; r++)
     {
 	for(k = 0; k < particles; k++)
 	{
-	    verletInt1(i, k, dt, x, v, a);
-	    box_reflect(i, k, x, v, a);
-	    compute_forces_naive(i, k, x, F);
-	    verletInt2(i, k, dt, x, v, a);
+	    if(i!=k)
+	    {
+		verletInt1(i, k, dt, x, v, a);
+		box_reflect(i, k, x, v, a);
+		compute_forces_naive(i, k, x, F);
+		verletInt2(i, k, dt, x, v, a);
+	    }
 	}
 	memset(F,0,2*particles*sizeof(float));
 	__syncthreads();
