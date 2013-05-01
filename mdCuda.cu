@@ -20,7 +20,7 @@
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
-#define N_BODY_NUM    10000
+#define N_BODY_NUM    50000
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -50,11 +50,11 @@ typedef struct molecule_t {
 }mols; 
 
 __device__ void compute_forces_naive(int n, int k, float* x, float* F);
-__device__ void box_reflect(int n,int k, float* x, float* v, float* a);
+__device__ void box_reflect(int k, float* x, float* v, float* a);
 __device__ void reflect(float wall, float* x, float* v, float* a);
-__device__ void verletInt2(int n,int k, float dt, float* x, float* v, float* a);	 
+__device__ void verletInt2(int k, float dt, float* x, float* v, float* a);	 
 __device__ float compute_LJ_Scalar(float r2, float eps, float sig2);
-__device__ void verletInt1(int n, int k, float dt, float* x, float* v, float* a);	    
+__device__ void verletInt1(int k, float dt, float* x, float* v, float* a);	    
 int init_particles(int n, float* x, float* v, params* param);
 void init_particles_va(int n, float* v,float* a, params* param);
 
@@ -62,24 +62,25 @@ void init_particles_va(int n, float* v,float* a, params* param);
 struct timespec diff(struct timespec start, struct timespec end);
 void cudaErrorCheck(cudaError_t err);
 
-// computeforces kernel
+
 __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int particles)
 {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     const int iter = ITERS;
     int r,k;
-    float dt = DT;
+    float dt = 0.0001;
     for(r=0; r < iter; r++)
     {
 	for(k = 0; k < particles; k++)
 	{
 	    if(i!=k)
 	    {
-		verletInt1(i, k, dt, x, v, a);
-		box_reflect(i, k, x, v, a);
+		verletInt1(k, dt, x, v, a);
+		box_reflect(k, x, v, a);
 		compute_forces_naive(i, k, x, F);
-		verletInt2(i, k, dt, x, v, a);
+		verletInt2(k, dt, x, v, a);
+	    
 	    }
 	}
 	memset(F,0,2*particles*sizeof(float));
@@ -89,7 +90,12 @@ __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int p
 
 
 int main(int argc, char **argv){
-
+    
+    int nsize = N_BODY_NUM;
+    if(argc==2)
+    {
+	nsize = atoi(argv[1]);	
+    }                         
     struct timespec time1,time2;
     struct timespec time_stamp;
     cudaError_t err = cudaSuccess;
@@ -101,13 +107,13 @@ int main(int argc, char **argv){
 
     // global information
     params param;
-    param.npart = N_BODY_NUM;
+    param.npart = nsize;
     param.dt = DT;
     param.eps_lj = EPS;
     param.sig_lj = SIG;
 
     // declare size in bytes
-    size_t size = 2 * param.npart * sizeof(float);
+    size_t size = 2 * (param.npart) * sizeof(float);
 
     // Arrays on GPU global memory
     mols d_mol;
@@ -156,6 +162,7 @@ int main(int argc, char **argv){
     printf("\t... done\n\n");
 
     // Transfer the arrays to the GPU memory
+    printf("About to cudaMemcpy\n");
     err = cudaMemcpy(d_mol.x, h_mol.x, size , cudaMemcpyHostToDevice);
     cudaErrorCheck(err);
 
@@ -167,6 +174,7 @@ int main(int argc, char **argv){
 
     err = cudaMemcpy(d_mol.F, h_mol.F, size , cudaMemcpyHostToDevice);
     cudaErrorCheck(err);
+    printf("Finished cudaMemcpy\n");
 
     // create timer and start the timer
     cudaEvent_t start,stop;
@@ -183,32 +191,43 @@ int main(int argc, char **argv){
 
 
     /// gives the ceiling function for # of blocks  -->  Launch the kernel
-    int blocksPerGrid = (param.npart+15)/16;	
+    int blocksPerGrid = (param.npart/256)+1;	
+    
+    printf("\n%d\n",blocksPerGrid);
+    
     dim3 dimGrid(blocksPerGrid,blocksPerGrid);		
     dim3 dimBlock(16,16);
 
     // Generate actual cuda call
     printf("Making call to kernel\n");
-    kernel_VanDerWaals<<< dimGrid,dimBlock >>>(h_mol.x, h_mol.v, h_mol.a, h_mol.F, param.npart);
+    kernel_VanDerWaals<<< blocksPerGrid,dimBlock >>>(d_mol.x, d_mol.v, d_mol.a, d_mol.F, param.npart);
 
+
+    // Transfer the results back to the host
+    printf("Waiting for computation to complete...\n");
+    
+    // just added this line for debugging purposes
+    err = cudaThreadSynchronize();
+    cudaErrorCheck(err);
     // Check if kernel execution generated an error
     err = cudaGetLastError();
     cudaErrorCheck(err);
 
-    // Transfer the results back to the host
-    printf("Waiting for computation to complete...\n");
-
     err = cudaMemcpy( h_mol.x , d_mol.x , size ,cudaMemcpyDeviceToHost);    
     cudaErrorCheck(err);
+    printf("Memcpy #1 complete ...\n");
 
     err = cudaMemcpy( h_mol.v , d_mol.v , size ,cudaMemcpyDeviceToHost);    
     cudaErrorCheck(err);
+    printf("Memcpy #2 complete ...\n");
 
     err = cudaMemcpy( h_mol.a , d_mol.a , size ,cudaMemcpyDeviceToHost);    
     cudaErrorCheck(err);
+    printf("Memcpy #3 complete ...\n");
 
     err = cudaMemcpy( h_mol.F , d_mol.F , size ,cudaMemcpyDeviceToHost);    
     cudaErrorCheck(err);
+    printf("Memcpy #4 complete ...\n");
 
     printf("Complete!\n");
 
@@ -303,7 +322,7 @@ void cudaErrorCheck(cudaError_t err)
 {
     if(err!=cudaSuccess)
     {
-	fprintf(stderr, "Failed to create timer (error code %s) \n",cudaGetErrorString(err));
+	fprintf(stderr, "cudaError (error code %s) \n",cudaGetErrorString(err));
 	exit(EXIT_FAILURE);
     }
 }
@@ -373,16 +392,16 @@ __device__ float compute_LJ_Scalar(float r2, float eps, float sig2)
     return 0;
 }
 
-__device__ void verletInt1(int n, int k, float dt, float* x, float* v, float* a)	    
+__device__ void verletInt1(int k, float dt, float* x, float* v, float* a)	    
 {                            
     int two_i = 2*k;                                      // assumes that we havbe 2D data
-    v[two_i] = a[two_i] * dt/2.0;		    // spltwo_it up for a 2D 
-    v[two_i+1] = a[two_i+1] * dt/2.0;
+    v[two_i] = a[two_i] * (dt/2.0);		    // spltwo_it up for a 2D 
+    v[two_i+1] = a[two_i+1] * (dt/2.0);
     x[two_i] = v[two_i] * dt;
     x[two_i+1] = v[two_i+1] * dt;
 }
 
-__device__ void verletInt2(int n,int k, float dt, float* x, float* v, float* a)	 
+__device__ void verletInt2(int k, float dt, float* x, float* v, float* a)	 
 {
     int two_i = 2*k;
     int v0 = v[two_i];
@@ -402,7 +421,7 @@ __device__ void reflect(float wall, float* x, float* v, float* a)
     *a = -(*a);
 }
 
-__device__ void box_reflect(int n,int k, float* x, float* v, float* a)
+__device__ void box_reflect(int k, float* x, float* v, float* a)
 {
     int two_i = 2*k;
     if(x[two_i] < XMIN) reflect(XMIN,&x[two_i],&v[two_i],&a[two_i]);
@@ -413,6 +432,7 @@ __device__ void box_reflect(int n,int k, float* x, float* v, float* a)
 
 
 // now only executes over the bodies declared!
+// n is me and k is them
 __device__ void compute_forces_naive(int n, int k, float* x, float* F)
 {
     float eps = EPS;

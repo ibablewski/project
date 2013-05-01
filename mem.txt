@@ -1,0 +1,23 @@
+About to cudaMalloc
+Finished the cudaMalloc
+
+Initializing the Particles ...	... done
+
+About to cudaMemcpy
+Finished cudaMemcpy
+Making call to kernel
+Waiting for computation to complete...
+Memcpy #1 complete ...
+Memcpy #2 complete ...
+Memcpy #3 complete ...
+Memcpy #4 complete ...
+Complete!
+
+Final times
+ArraySize, GPU time (msec)
+Time to run kernel: 21.554688
+Time to run kernel with memcopy: 27.455521
+Time to run serial code: 0.485435
+We actually did it! 
+========= CUDA-MEMCHECK
+========= ERROR SUMMARY: 0 errors
