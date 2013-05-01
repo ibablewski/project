@@ -730,6 +730,7 @@ if(near){
 }
     verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
     memset(mol.F, 0 , 2*param.npart * sizeof(float));
+    memset(adj.n, -1 , sizeof(int) * GRID_NUM * GRID_NUM * Num);
   }
 
 #if(LINUX)
