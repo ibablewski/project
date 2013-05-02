@@ -30,8 +30,8 @@
 #define ITERS         100
 #define BOX_SIZE      10.0
 #define GRID_NUM      ((BOX_SIZE)/(RCUT))
-#define SHARED_MEM_SIZE	    32768
-#define SPAN_WIDTH	((SHARED_MEM_SIZE/4)/((N_BODY_NUM+255)/256))
+#define SHARED_MEM_SIZE	    4096		// this is a 1/4 piece of total shared memory
+#define SPAN_WIDTH	(SHARED_MEM_SIZE/((N_BODY_NUM+255)/256))
 
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
@@ -79,32 +79,32 @@ __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int p
     int r,k,m;
     float dt = 0.0001;
 
-	for(m=0; m < loop; m++)
+    for(m=0; m < loop; m++)
+    {
+	s_x[i] = x[m*SPAN_WIDTH+threadIdx.x];
+	s_v[i] = v[m*SPAN_WIDTH+threadIdx.x];
+	s_a[i] = a[m*SPAN_WIDTH+threadIdx.x];
+	s_F[i] = F[m*SPAN_WIDTH+threadIdx.x];
+	__syncthreads();
+	for(k = (m*SPAN_WIDTH); k < (m*SPAN_WIDTH+SPAN_WIDTH); k++)
 	{
-	    s_x[i] = x[m*SPAN_WIDTH+threadIdx.x];
-	    s_v[i] = v[m*SPAN_WIDTH+threadIdx.x];
-	    s_a[i] = a[m*SPAN_WIDTH+threadIdx.x];
-	    s_F[i] = F[m*SPAN_WIDTH+threadIdx.x];
-	    __syncthreads();
-	    for(k = 0; k < SPAN_WIDTH; k++)
+	    if(i!=k)
 	    {
-		if(i!=k)
-		{
-		    verletInt1(k, dt, s_x, s_v, s_a);
-		    box_reflect(k, x, v, a);
-		    compute_forces_naive(i, k, s_x, s_F);
-		    verletInt2(k, dt, x, s_v, s_a);
+		verletInt1(k, dt, s_x, s_v, s_a);
+		box_reflect(k, x, v, a);
+		compute_forces_naive(i, k, s_x, s_F);
+		verletInt2(k, dt, x, s_v, s_a);
 
-		}
 	    }
-		x[m*SPAN_WIDTH+threadIdx.x] = s_x[i];
-		v[m*SPAN_WIDTH+threadIdx.x] = s_v[i];
-		a[m*SPAN_WIDTH+threadIdx.x] = s_a[i];
-		F[m*SPAN_WIDTH+threadIdx.x] = s_F[i];
-		__syncthreads();
 	}
-	memset(s_F,0,2*particles*sizeof(float));
-//	__syncthreads();
+	x[m*SPAN_WIDTH+threadIdx.x] = s_x[i];
+	v[m*SPAN_WIDTH+threadIdx.x] = s_v[i];
+	a[m*SPAN_WIDTH+threadIdx.x] = s_a[i];
+	F[m*SPAN_WIDTH+threadIdx.x] = s_F[i];
+	__syncthreads();
+    }
+    memset(s_F,0,2*particles*sizeof(float));
+    //	__syncthreads();
 }
 
 
@@ -211,11 +211,10 @@ int main(int argc, char **argv){
 
     /// gives the ceiling function for # of blocks  -->  Launch the kernel
     int blocksPerGrid = ((param.npart+255)/256);
-    int span = 32768 / blocksPerGrid;	
 
     printf("\n%d\n",blocksPerGrid);
 
-    dim3 dimGrid(blocksPerGrid,blocksPerGrid);		
+    dim3 dimGrid(blocksPerGrid);		
     dim3 dimBlock(256);
 
     // Generate actual cuda call

@@ -20,7 +20,7 @@
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
-#define N_BODY_NUM    4096
+#define N_BODY_NUM    8192
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -194,7 +194,7 @@ int main(int argc, char **argv){
     
     printf("\n%d\n",blocksPerGrid);
     
-    dim3 dimGrid(blocksPerGrid,blocksPerGrid);		
+    dim3 dimGrid(blocksPerGrid);		
     dim3 dimBlock(256);
 
     // Generate actual cuda call
