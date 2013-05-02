@@ -30,6 +30,8 @@
 #define ITERS         100
 #define BOX_SIZE      10.0
 #define GRID_NUM      ((BOX_SIZE)/(RCUT))
+#define SHARED_MEM_SIZE	    32768
+#define SPAN_WIDTH	((SHARED_MEM_SIZE/4)/((N_BODY_NUM+255)/256))
 
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
@@ -62,34 +64,52 @@ void init_particles_va(int n, float* v,float* a, params* param);
 struct timespec diff(struct timespec start, struct timespec end);
 void cudaErrorCheck(cudaError_t err);
 
+
 __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int particles)
 {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    const int iter = ITERS;
-    int r,k;
+    const unsigned int loop = particles/SPAN_WIDTH;
+
+    __shared__ float s_x[SPAN_WIDTH];
+    __shared__ float s_v[SPAN_WIDTH];
+    __shared__ float s_a[SPAN_WIDTH];
+    __shared__ float s_F[SPAN_WIDTH];
+
+    int r,k,m;
     float dt = 0.0001;
-//    for(r=0; r < iter; r++)
-//    {
-	for(k = 0; k < particles; k++)
+
+	for(m=0; m < loop; m++)
 	{
-	    if(i!=k)
+	    s_x[i] = x[m*SPAN_WIDTH+threadIdx.x];
+	    s_v[i] = v[m*SPAN_WIDTH+threadIdx.x];
+	    s_a[i] = a[m*SPAN_WIDTH+threadIdx.x];
+	    s_F[i] = F[m*SPAN_WIDTH+threadIdx.x];
+	    __syncthreads();
+	    for(k = 0; k < SPAN_WIDTH; k++)
 	    {
-		verletInt1(k, dt, x, v, a);
-		box_reflect(k, x, v, a);
-		compute_forces_naive(i, k, x, F);
-		verletInt2(k, dt, x, v, a);
-	    
+		if(i!=k)
+		{
+		    verletInt1(k, dt, s_x, s_v, s_a);
+		    box_reflect(k, x, v, a);
+		    compute_forces_naive(i, k, s_x, s_F);
+		    verletInt2(k, dt, x, s_v, s_a);
+
+		}
 	    }
+		x[m*SPAN_WIDTH+threadIdx.x] = s_x[i];
+		v[m*SPAN_WIDTH+threadIdx.x] = s_v[i];
+		a[m*SPAN_WIDTH+threadIdx.x] = s_a[i];
+		F[m*SPAN_WIDTH+threadIdx.x] = s_F[i];
+		__syncthreads();
 	}
-	memset(F,0,2*particles*sizeof(float));
-	__syncthreads();
-  //  }
+	memset(s_F,0,2*particles*sizeof(float));
+//	__syncthreads();
 }
 
 
 int main(int argc, char **argv){
-    
+
     int nsize = N_BODY_NUM;
     if(argc==2)
     {
@@ -190,10 +210,11 @@ int main(int argc, char **argv){
 
 
     /// gives the ceiling function for # of blocks  -->  Launch the kernel
-    int blocksPerGrid = ((param.npart+255)/256);	
-    
+    int blocksPerGrid = ((param.npart+255)/256);
+    int span = 32768 / blocksPerGrid;	
+
     printf("\n%d\n",blocksPerGrid);
-    
+
     dim3 dimGrid(blocksPerGrid,blocksPerGrid);		
     dim3 dimBlock(256);
 
@@ -204,7 +225,7 @@ int main(int argc, char **argv){
 
     // Transfer the results back to the host
     printf("Waiting for computation to complete...\n");
-    
+
     // just added this line for debugging purposes
     err = cudaThreadSynchronize();
     cudaErrorCheck(err);
