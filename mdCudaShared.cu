@@ -99,13 +99,14 @@ __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int p
 		verletInt2(k, dt, x, s_v, s_a);
 	    }
 	}
+/*
         x[idx] = s_x[threadIdx.x];
 	v[idx] = s_v[threadIdx.x];
 	a[idx] = s_a[threadIdx.x];
-	F[idx] = s_F[threadIdx.x];  
+	F[idx] = s_F[threadIdx.x];   */
 	__syncthreads();
     }
-    //memset(s_F,0,2*particles*sizeof(float));
+    memset(F,0,2*particles*sizeof(float));
 }
 
 
@@ -229,6 +230,15 @@ int main(int argc, char **argv){
     // just added this line for debugging purposes
     err = cudaThreadSynchronize();
     cudaErrorCheck(err);
+    
+    err = cudaEventCreate(&stop);
+    cudaErrorCheck(err);
+
+    err = cudaEventRecord(stop,0);
+    cudaErrorCheck(err);
+
+    err = cudaEventSynchronize(stop);
+    cudaErrorCheck(err);
     // Check if kernel execution generated an error
     err = cudaGetLastError();
     cudaErrorCheck(err);
@@ -264,14 +274,6 @@ int main(int argc, char **argv){
     err = cudaEventSynchronize(stop1);
     cudaErrorCheck(err);
 
-    err = cudaEventCreate(&stop);
-    cudaErrorCheck(err);
-
-    err = cudaEventRecord(stop,0);
-    cudaErrorCheck(err);
-
-    err = cudaEventSynchronize(stop);
-    cudaErrorCheck(err);
 
     // Get the time
     cudaEventElapsedTime(&elapsed_gpu[0],start,stop);           // inlcuding kernel call only

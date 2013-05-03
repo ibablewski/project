@@ -1,0 +1,59 @@
+Final times
+ArraySize, GPU time (msec)
+201.071869
+337.781433
+0.617380
+
+Final times
+ArraySize, GPU time (msec)
+786.627197
+1330.641846
+1.398510
+
+Final times
+ArraySize, GPU time (msec)
+1229.249634
+2467.212646
+2.535685
+
+Final times
+ArraySize, GPU time (msec)
+2425.487549
+4618.968262
+4.688731
+
+Final times
+ArraySize, GPU time (msec)
+3965.422119
+7418.790039
+7.486848
+
+Final times
+ArraySize, GPU time (msec)
+4933.937988
+9915.227539
+9.983571
+
+Final times
+ArraySize, GPU time (msec)
+7095.241211
+13912.760742
+13.980720
+
+Final times
+ArraySize, GPU time (msec)
+8357.490234
+17321.402344
+17.390112
+
+Final times
+ArraySize, GPU time (msec)
+11040.674805
+22486.189453
+22.554595
+
+Final times
+ArraySize, GPU time (msec)
+14037.422852
+28204.029297
+28.272984
