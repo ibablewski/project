@@ -1,5 +1,5 @@
 /// stuff happening 
-// nvall -o mdCuda mdCuda.cu -g -G -lrt -lm
+// nvall -o share mdCudaShared.cu -g -G -lrt -lm
 
 
 #include <stdio.h>
@@ -20,7 +20,7 @@
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
-#define N_BODY_NUM    4096
+#define N_BODY_NUM    16384
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -30,9 +30,9 @@
 #define ITERS         100
 #define BOX_SIZE      10.0
 #define GRID_NUM      ((BOX_SIZE)/(RCUT))
-#define SHARED_MEM_SIZE	    4096		// this is a 1/4 piece of total shared memory
-#define SPAN_WIDTH	(SHARED_MEM_SIZE/((N_BODY_NUM+255)/256))
-
+#define SHARED_MEM_SIZE	    8192		// this is a 1/4 piece of total shared memory
+//#define SPAN_WIDTH	(SHARED_MEM_SIZE/((N_BODY_NUM+255)/256))
+#define SPAN_WIDTH	256
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
 #define EST_NUM(GRID_NUM,N_BODY_NUM) (N_BODY_NUM/(GRID_NUM*GRID_NUM))
@@ -51,7 +51,7 @@ typedef struct molecule_t {
     float* F;
 }mols; 
 
-__device__ void compute_forces_naive(int n, int k, float* x, float* F);
+__device__ void compute_forces_naive(float x1, int k, float* x, float* F);
 __device__ void box_reflect(int k, float* x, float* v, float* a);
 __device__ void reflect(float wall, float* x, float* v, float* a);
 __device__ void verletInt2(int k, float dt, float* x, float* v, float* a);	 
@@ -67,44 +67,45 @@ void cudaErrorCheck(cudaError_t err);
 
 __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int particles)
 {
-    const int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    const unsigned int loop = particles/SPAN_WIDTH;
-
+    
     __shared__ float s_x[SPAN_WIDTH];
     __shared__ float s_v[SPAN_WIDTH];
     __shared__ float s_a[SPAN_WIDTH];
     __shared__ float s_F[SPAN_WIDTH];
 
-    int r,k,m;
+    int i,k,tile;
+    const int gtid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    float myX = x[gtid];
     float dt = 0.0001;
 
-    for(m=0; m < loop; m++)
+    for(tile=0,i=0; i < 2*particles; i+=blockDim.x, tile++)
     {
-	s_x[i] = x[m*SPAN_WIDTH+threadIdx.x];
-	s_v[i] = v[m*SPAN_WIDTH+threadIdx.x];
-	s_a[i] = a[m*SPAN_WIDTH+threadIdx.x];
-	s_F[i] = F[m*SPAN_WIDTH+threadIdx.x];
+	int idx = tile * blockDim.x + threadIdx.x;
+	s_x[threadIdx.x] = x[idx];
+	s_v[threadIdx.x] = v[idx];
+	s_a[threadIdx.x] = a[idx];
+	s_F[threadIdx.x] = F[idx];
+    
 	__syncthreads();
-	for(k = (m*SPAN_WIDTH); k < (m*SPAN_WIDTH+SPAN_WIDTH); k++)
+
+	for(k = 0; k < (blockDim.x); k++)
 	{
 	    if(i!=k)
 	    {
 		verletInt1(k, dt, s_x, s_v, s_a);
 		box_reflect(k, x, v, a);
-		compute_forces_naive(i, k, s_x, s_F);
+		compute_forces_naive(myX, k, s_x, s_F);
 		verletInt2(k, dt, x, s_v, s_a);
-
 	    }
 	}
-	x[m*SPAN_WIDTH+threadIdx.x] = s_x[i];
-	v[m*SPAN_WIDTH+threadIdx.x] = s_v[i];
-	a[m*SPAN_WIDTH+threadIdx.x] = s_a[i];
-	F[m*SPAN_WIDTH+threadIdx.x] = s_F[i];
+        x[idx] = s_x[threadIdx.x];
+	v[idx] = s_v[threadIdx.x];
+	a[idx] = s_a[threadIdx.x];
+	F[idx] = s_F[threadIdx.x];  
 	__syncthreads();
     }
-    memset(s_F,0,2*particles*sizeof(float));
-    //	__syncthreads();
+    //memset(s_F,0,2*particles*sizeof(float));
 }
 
 
@@ -413,22 +414,22 @@ __device__ float compute_LJ_Scalar(float r2, float eps, float sig2)
 
 __device__ void verletInt1(int k, float dt, float* x, float* v, float* a)	    
 {                            
-    int two_i = 2*k;                                      // assumes that we havbe 2D data
-    v[two_i] = a[two_i] * (dt/2.0);		    // spltwo_it up for a 2D 
-    v[two_i+1] = a[two_i+1] * (dt/2.0);
-    x[two_i] = v[two_i] * dt;
-    x[two_i+1] = v[two_i+1] * dt;
+//    int two_i = 2*k;                                      // assumes that we havbe 2D data
+    v[k] = a[k] * (dt/2.0);		    // spltwo_it up for a 2D 
+//    v[two_i+1] = a[two_i+1] * (dt/2.0);
+    x[k] = v[k] * dt;
+//    x[two_i+1] = v[two_i+1] * dt;
 }
 
 __device__ void verletInt2(int k, float dt, float* x, float* v, float* a)	 
 {
-    int two_i = 2*k;
-    int v0 = v[two_i];
-    int v1 = v[two_i+1];
-    v[two_i] = a[two_i] * dt/2.0;		    // spltwo_it up for 2D
-    v[two_i+1] = a[two_i+1] * dt/2.0;
-    a[two_i] += (v[two_i]-v0)/dt;
-    a[two_i+1] += (v[two_i+1]-v1)/dt;
+ //   int two_i = 2*k;
+    int v0 = v[k];
+ //   int v1 = v[two_i+1];
+    v[k] = a[k] * dt/2.0;		    // spltwo_it up for 2D
+//    v[two_i+1] = a[two_i+1] * dt/2.0;
+    a[k] += (v[k]-v0)/dt;
+//    a[two_i+1] += (v[two_i+1]-v1)/dt;
 }
 
 // should check for reflection inbetween 
@@ -442,28 +443,28 @@ __device__ void reflect(float wall, float* x, float* v, float* a)
 
 __device__ void box_reflect(int k, float* x, float* v, float* a)
 {
-    int two_i = 2*k;
-    if(x[two_i] < XMIN) reflect(XMIN,&x[two_i],&v[two_i],&a[two_i]);
-    if(x[two_i] > XMAX) reflect(XMAX,&x[two_i],&v[two_i],&a[two_i]);
-    if(x[two_i+1] < YMIN) reflect(YMIN,&x[two_i+1],&v[two_i+1],&a[two_i+1]);
-    if(x[two_i+1] > YMAX) reflect(YMAX,&x[two_i+1],&v[two_i+1],&a[two_i+1]);
+//    int two_i = 2*k;
+    if(x[k] < XMIN) reflect(XMIN,&x[k],&v[k],&a[k]);
+    if(x[k] > XMAX) reflect(XMAX,&x[k],&v[k],&a[k]);
+//    if(x[two_i+1] < YMIN) reflect(YMIN,&x[two_i+1],&v[two_i+1],&a[two_i+1]);
+//    if(x[two_i+1] > YMAX) reflect(YMAX,&x[two_i+1],&v[two_i+1],&a[two_i+1]);
 }
 
 
 // now only executes over the bodies declared!
 // n is me and k is them
-__device__ void compute_forces_naive(int n, int k, float* x, float* F)
+__device__ void compute_forces_naive(float x1, int n, float* x, float* F)
 {
     float eps = EPS;
     float sig = SIG;
-    float sig2 = sig*sig;
-    float dx,dy,lj_scalar;
+//    float sig2 = sig*sig;
+    float dx,lj_scalar;
 
-    dx = x[2*k] - x[2*n];
-    dy = x[2*k+1] - x[2*n+1];
-    lj_scalar = compute_LJ_Scalar(dx*dx+dy*dy,eps,sig2);
+    dx = x1 - x[2*n];
+ //   dy = y1 - x[2*n+1];
+    lj_scalar = compute_LJ_Scalar(dx*dx,eps,sig);
     F[2*n] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
-    F[2*n+1] += lj_scalar * dy;
+//    F[2*n+1] += lj_scalar * dy;
 } 
 
 

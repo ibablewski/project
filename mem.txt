@@ -6,12 +6,12 @@ Initializing the Particles ...	... done
 About to cudaMemcpy
 Finished cudaMemcpy
 
-16
+8
 Making call to kernel
 Waiting for computation to complete...
 ========= CUDA-MEMCHECK
 ========= Out-of-range Shared or Local Address
-=========     at 0x00000228 in mdCudaShared.cu:85:kernel_VanDerWaals
-=========     by thread (0,0,0) in block (15,0,0)
+=========     at 0x000022b8 in mdCudaShared.cu:113:kernel_VanDerWaals
+=========     by thread (224,0,0) in block (3,0,0)
 =========
 ========= ERROR SUMMARY: 1 error

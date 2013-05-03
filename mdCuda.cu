@@ -20,7 +20,7 @@
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
-#define N_BODY_NUM    8192
+#define N_BODY_NUM    16384
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -69,27 +69,24 @@ __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int p
     const int iter = ITERS;
     int r,k;
     float dt = 0.0001;
-//    for(r=0; r < iter; r++)
-//    {
-	for(k = 0; k < particles; k++)
+    for(k = 0; k < particles; k++)
+    {
+	if(i!=k)
 	{
-	    if(i!=k)
-	    {
-		verletInt1(k, dt, x, v, a);
-		box_reflect(k, x, v, a);
-		compute_forces_naive(i, k, x, F);
-		verletInt2(k, dt, x, v, a);
-	    
-	    }
+	    verletInt1(k, dt, x, v, a);
+	    box_reflect(k, x, v, a);
+	    compute_forces_naive(i, k, x, F);
+	    verletInt2(k, dt, x, v, a);
+
 	}
-	memset(F,0,2*particles*sizeof(float));
-	__syncthreads();
-  //  }
+    }
+    memset(F,0,2*particles*sizeof(float));
+    __syncthreads();
 }
 
 
 int main(int argc, char **argv){
-    
+
     int nsize = N_BODY_NUM;
     if(argc==2)
     {
@@ -191,9 +188,9 @@ int main(int argc, char **argv){
 
     /// gives the ceiling function for # of blocks  -->  Launch the kernel
     int blocksPerGrid = ((param.npart+255)/256);	
-    
+
     printf("\n%d\n",blocksPerGrid);
-    
+
     dim3 dimGrid(blocksPerGrid);		
     dim3 dimBlock(256);
 
@@ -204,7 +201,7 @@ int main(int argc, char **argv){
 
     // Transfer the results back to the host
     printf("Waiting for computation to complete...\n");
-    
+
     // just added this line for debugging purposes
     err = cudaThreadSynchronize();
     cudaErrorCheck(err);
