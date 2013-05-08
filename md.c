@@ -87,7 +87,6 @@ int init_particles(int n, float* x, float* v, params* param)
         dx = x[2*i] - x[2*j];
         dy = x[2*i+1] - x[2*j+1];
         r2 = dx*dx + dy*dy;
-        //printf("Sample%d:%d %f %f %f %f\n",i,j,min_r2,r2,dx,dy);
         if(r2 < min_r2)
           break;
       }
@@ -110,7 +109,6 @@ void init_particles_va(int n, float* v,float* a, params* param)
     T = 2 * PI * drand48();
     v[2*i] = (R * cos(T));
     v[2*i+1] = (R * sin(T));
-    //    printf("SampleVel%d %f %f\n",i,v[2*i],v[2*i+1]);
     a[2*i] = (R * cos(T))/param->dt;
     a[2*i+1] = (R * sin(T))/param->dt;
   }
@@ -191,7 +189,8 @@ void box_reflect(int n, float* x, float* v, float* a)
     if(x[2*i+1] > YMAX) reflect(YMAX,&x[2*i+1],&v[2*i+1],&a[2*i+1]);
   }
 }
- 
+
+/*  This algorithm runs as n^2 complexity  , No optimizations*/ 
 void compute_forces_naive(int n, float* x, float* F)
 {
   int i,j;
@@ -215,6 +214,7 @@ void compute_forces_naive(int n, float* x, float* F)
   }
 } 
 
+/* This algorithm runs as 1/2 N*2, No other opimizations other than that */
 void compute_forces(int n, float* x, float* F)
 {
   int i,j;
@@ -238,6 +238,7 @@ void compute_forces(int n, float* x, float* F)
   }
 }
 
+/* Force computation for NearBody algorithm, Accounts for corner cases */
 void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, int partsPerBlock)
 {
   int i,j,k,l,r, two_i;
@@ -249,7 +250,6 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
 
   for(i=0;i<n;i++)
   {
-    //printf("%d\n",i);
     two_i = 2*i;
     myBlock = getMyBlock(n,two_i,adj,partsPerBlock);
     // work along the top row
@@ -521,11 +521,7 @@ void compute_forces_nearby(int n,int* adj, float* x, float* F, int blockNum1D, i
   }
 }
 
-int maxNumPartPerBlock(float blockSize, float sig)
-{
-  return ((blockSize*blockSize)/(sig*sig));
-}
-
+/* Puts all of the particles indexes into proper gird compartments */
 void gridSort(int n, int numBlocks, int numPartsPerBox, int* adj, float* x)
 {
   float start = (BOX_SIZE/2.0)-BOX_SIZE;
@@ -588,8 +584,6 @@ int main(int argc, char** argv)
 {
 
   int size = 0;
-  //  for(size=0;size<argc;size++)
-    //        printf("%s, %d\n",argv[size],size);
   int opt = 0;
   int near = 0;
 
@@ -637,10 +631,8 @@ int main(int argc, char** argv)
   mol.v = malloc(2*param.npart * sizeof(float));
   mol.a = malloc(2*param.npart * sizeof(float));
   mol.F = malloc(2*param.npart * sizeof(float));
-//#if (NEAREST)
 if(near){
   double Blength = BLOCK_LENGTH(GRID_NUM,BOX_SIZE);
-  //printf("Blength: %lf\n",Blength);
   Num = EST_NUM(GRID_NUM,size);
   Num = 4*Num;
   if(!Num)
@@ -654,29 +646,21 @@ if(near){
 
   adj.n = malloc(sizeof(int) * GRID_NUM * GRID_NUM * Num);
   memset(adj.n,-1,sizeof(int) * GRID_NUM * GRID_NUM *  Num);
-  //printf("Num: %d\n",Num);
-//#endif
 }
   npart = init_particles(param.npart, mol.x , mol.v, &param);
   if(npart < param.npart)
   {
-   // fprintf(stderr, "Could not generate %d particles, Trying %d particles instead\n",param.npart,npart);
     param.npart = npart;
   }
   else
   {
-    //fprintf(stdout,"Generated %d particles\n",param.npart);
   }
 
   init_particles_va( param.npart, mol.v,mol.a, &param);
 
-//#if(NEAREST)
 if(near)
 {
-  //printf("Before gridSort\n");
   gridSort(npart, GRID_NUM, Num, adj.n, mol.x);
-  //printf("After gridSort\n");
-//#endif
   }
   /*for(i=0;i<npart;i++)
     printf("myBlockNum: %d\n",getMyBlock(param.npart,2*i, adj.n, Num/2));
@@ -695,38 +679,27 @@ if(near)
   clock_gettime(CLOCK_REALTIME, &time1);
 
 #endif
-//#if(NEAREST)
 if(near){
   compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
 }else if(opt){
-//#elif(OPT)  
   compute_forces(param.npart,mol.x,mol.F);
-//#else
 }else{
     compute_forces_naive(param.npart,mol.x,mol.F);
 
-//#endif
 }
-  //printf("After First ComputeForces\n");
   for(i=0;i<ITERS;i++)
   {
-//#if(NEAREST)
 if(near){
     gridSort(npart, GRID_NUM, Num, adj.n, mol.x);		    // Added in the gridSort function for each iteration
 }
-//#endif
     verletInt1(param.npart,param.dt , mol.x, mol.v,mol.a);
     box_reflect(param.npart,mol.x,mol.v,mol.a );
-//#if(NEAREST)
 if(near){
     compute_forces_nearby(param.npart, adj.n, mol.x, mol.F, GRID_NUM, Num);
-//#elif(OPT)
 }else if(opt){
     compute_forces(param.npart,mol.x,mol.F);
-//#else
 }else{
     compute_forces_naive(param.npart,mol.x,mol.F);
-//#endif
 }
     verletInt2(param.npart,param.dt, mol.x, mol.v, mol.a);
     memset(mol.F, 0 , 2*param.npart * sizeof(float));
@@ -774,18 +747,6 @@ else
 printf("%s, %d\n","s",param.npart);
 #endif
 
-  /*        // test statements for the grid allocation
-            int count =0;
-            for(i=0;i<GRID_NUM*GRID_NUM*Num/2;i++)
-            {
-            if(adj.n[i]!=-1)
-            {
-            count++;
-            }
-            }
-            printf("%d\n",count);
-
-*/
 #if(NEAREST)
   free(adj.n);
 #endif
@@ -793,7 +754,6 @@ printf("%s, %d\n","s",param.npart);
   free(mol.v);
   free(mol.a);
   free(mol.F);
-//  printf("Done\n");
 
   return 0;
 }
