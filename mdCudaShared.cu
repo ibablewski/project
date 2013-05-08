@@ -20,7 +20,7 @@
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
-#define N_BODY_NUM    16384
+#define N_BODY_NUM    5000
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -30,8 +30,6 @@
 #define ITERS         100
 #define BOX_SIZE      10.0
 #define GRID_NUM      ((BOX_SIZE)/(RCUT))
-#define SHARED_MEM_SIZE	    8192		// this is a 1/4 piece of total shared memory
-//#define SPAN_WIDTH	(SHARED_MEM_SIZE/((N_BODY_NUM+255)/256))
 #define SPAN_WIDTH	256
 
 #define BLOCK_LENGTH(GRID_NUM,BOX_SIZE) (BOX_SIZE/GRID_NUM)		    // size of block that contains GRID_BLOCK_NUM
@@ -64,49 +62,43 @@ void init_particles_va(int n, float* v,float* a, params* param);
 struct timespec diff(struct timespec start, struct timespec end);
 void cudaErrorCheck(cudaError_t err);
 
-
+// shared memory kernel
 __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int particles)
 {
-    
     __shared__ float s_x[SPAN_WIDTH];
     __shared__ float s_v[SPAN_WIDTH];
     __shared__ float s_a[SPAN_WIDTH];
     __shared__ float s_F[SPAN_WIDTH];
 
-    int i,k,tile;
+    int i,k,r,tile;
     const int gtid = blockIdx.x * blockDim.x + threadIdx.x;
-
     float myX = x[gtid];
     float dt = 0.0001;
-
-    for(tile=0,i=0; i < 2*particles; i+=blockDim.x, tile++)
-    {
-	int idx = tile * blockDim.x + threadIdx.x;
-	s_x[threadIdx.x] = x[idx];
-	s_v[threadIdx.x] = v[idx];
-	s_a[threadIdx.x] = a[idx];
-	s_F[threadIdx.x] = F[idx];
-    
-	__syncthreads();
-
-	for(k = 0; k < (blockDim.x); k++)
+    for(r=0;r<ITERS;r++){
+	for(tile=0,i=0; i < 2*particles; i+=blockDim.x, tile++)
 	{
-	    if(i!=k)
+	    int idx = tile * blockDim.x + threadIdx.x;
+	    s_x[threadIdx.x] = x[idx];
+	    s_v[threadIdx.x] = v[idx];
+	    s_a[threadIdx.x] = a[idx];
+	    s_F[threadIdx.x] = F[idx];
+	    __syncthreads();
+	    for(k = 0; k < blockDim.x; k++)
 	    {
-		verletInt1(k, dt, s_x, s_v, s_a);
-		box_reflect(k, x, v, a);
-		compute_forces_naive(myX, k, s_x, s_F);
-		verletInt2(k, dt, x, s_v, s_a);
+		if(i!=k)
+		{
+		    verletInt1(k, dt, s_x, s_v, s_a);
+		    box_reflect(k, x, v, a);
+		    compute_forces_naive(myX, k, s_x, s_F);
+		    verletInt2(k, dt, x, s_v, s_a);
+		}
 	    }
+	    x[idx] = s_x[threadIdx.x];
+	    v[idx] = s_v[threadIdx.x];
+	    a[idx] = s_a[threadIdx.x];   
+	    __syncthreads();
 	}
-/*
-        x[idx] = s_x[threadIdx.x];
-	v[idx] = s_v[threadIdx.x];
-	a[idx] = s_a[threadIdx.x];
-	F[idx] = s_F[threadIdx.x];   */
-	__syncthreads();
     }
-    memset(F,0,2*particles*sizeof(float));
 }
 
 
@@ -217,7 +209,7 @@ int main(int argc, char **argv){
     printf("\n%d\n",blocksPerGrid);
 
     dim3 dimGrid(blocksPerGrid);		
-    dim3 dimBlock(256);
+    dim3 dimBlock(256,1);
 
     // Generate actual cuda call
     printf("Making call to kernel\n");
@@ -230,7 +222,7 @@ int main(int argc, char **argv){
     // just added this line for debugging purposes
     err = cudaThreadSynchronize();
     cudaErrorCheck(err);
-    
+
     err = cudaEventCreate(&stop);
     cudaErrorCheck(err);
 
@@ -403,7 +395,7 @@ void init_particles_va(int n, float* v,float* a, params* param)
 }
 
 
-__device__ float compute_LJ_Scalar(float r2, float eps, float sig2)
+__device__ inline float compute_LJ_Scalar(float r2, float eps, float sig2)
 {
     if(r2 < (CUT2 * sig2))	    // 
     {
@@ -414,28 +406,28 @@ __device__ float compute_LJ_Scalar(float r2, float eps, float sig2)
     return 0;
 }
 
-__device__ void verletInt1(int k, float dt, float* x, float* v, float* a)	    
+__device__ inline void verletInt1(int k, float dt, float* x, float* v, float* a)	    
 {                            
-//    int two_i = 2*k;                                      // assumes that we havbe 2D data
+    //    int two_i = 2*k;                                      // assumes that we havbe 2D data
     v[k] = a[k] * (dt/2.0);		    // spltwo_it up for a 2D 
-//    v[two_i+1] = a[two_i+1] * (dt/2.0);
+    //    v[two_i+1] = a[two_i+1] * (dt/2.0);
     x[k] = v[k] * dt;
-//    x[two_i+1] = v[two_i+1] * dt;
+    //    x[two_i+1] = v[two_i+1] * dt;
 }
 
-__device__ void verletInt2(int k, float dt, float* x, float* v, float* a)	 
+__device__ inline void verletInt2(int k, float dt, float* x, float* v, float* a)	 
 {
- //   int two_i = 2*k;
+    //   int two_i = 2*k;
     int v0 = v[k];
- //   int v1 = v[two_i+1];
+    //   int v1 = v[two_i+1];
     v[k] = a[k] * dt/2.0;		    // spltwo_it up for 2D
-//    v[two_i+1] = a[two_i+1] * dt/2.0;
+    //    v[two_i+1] = a[two_i+1] * dt/2.0;
     a[k] += (v[k]-v0)/dt;
-//    a[two_i+1] += (v[two_i+1]-v1)/dt;
+    //    a[two_i+1] += (v[two_i+1]-v1)/dt;
 }
 
 // should check for reflection inbetween 
-__device__ void reflect(float wall, float* x, float* v, float* a)
+__device__ inline void reflect(float wall, float* x, float* v, float* a)
 {
     //printf("reflected!");
     *x = (2*wall-(*x));
@@ -443,30 +435,30 @@ __device__ void reflect(float wall, float* x, float* v, float* a)
     *a = -(*a);
 }
 
-__device__ void box_reflect(int k, float* x, float* v, float* a)
+__device__ inline void box_reflect(int k, float* x, float* v, float* a)
 {
-//    int two_i = 2*k;
+    //    int two_i = 2*k;
     if(x[k] < XMIN) reflect(XMIN,&x[k],&v[k],&a[k]);
     if(x[k] > XMAX) reflect(XMAX,&x[k],&v[k],&a[k]);
-//    if(x[two_i+1] < YMIN) reflect(YMIN,&x[two_i+1],&v[two_i+1],&a[two_i+1]);
-//    if(x[two_i+1] > YMAX) reflect(YMAX,&x[two_i+1],&v[two_i+1],&a[two_i+1]);
+    //    if(x[two_i+1] < YMIN) reflect(YMIN,&x[two_i+1],&v[two_i+1],&a[two_i+1]);
+    //    if(x[two_i+1] > YMAX) reflect(YMAX,&x[two_i+1],&v[two_i+1],&a[two_i+1]);
 }
 
 
 // now only executes over the bodies declared!
 // n is me and k is them
-__device__ void compute_forces_naive(float x1, int n, float* x, float* F)
+__device__ inline void compute_forces_naive(float x1, int n, float* x, float* F)
 {
     float eps = EPS;
     float sig = SIG;
-//    float sig2 = sig*sig;
+    //    float sig2 = sig*sig;
     float dx,lj_scalar;
 
     dx = x1 - x[2*n];
- //   dy = y1 - x[2*n+1];
+    //   dy = y1 - x[2*n+1];
     lj_scalar = compute_LJ_Scalar(dx*dx,eps,sig);
     F[2*n] += lj_scalar * dx;     		    // pos account for the direction of the vector from base molecule
-//    F[2*n+1] += lj_scalar * dy;
+    //    F[2*n+1] += lj_scalar * dy;
 } 
 
 

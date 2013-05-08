@@ -20,7 +20,7 @@
 #define CUT2	      CUT*CUT
 #define PI            3.14159265
 #define DT	      0.001           //  0.001 second time increments	     definitely want to change this 
-#define N_BODY_NUM    16384
+#define N_BODY_NUM    500000
 #define XMAX	      (BOX_SIZE/2.0)
 #define XMIN	      -(BOX_SIZE/2.0)
 #define YMAX	      (BOX_SIZE/2.0)
@@ -66,22 +66,23 @@ __global__ void kernel_VanDerWaals(float* x, float* v, float* a, float* F, int p
 {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    const int iter = ITERS;
     int r,k;
     float dt = 0.0001;
-    for(k = 0; k < particles; k++)
-    {
-	if(i!=k)
+    for(r=0;r<ITERS;r++){
+	for(k = 0; k < particles; k++)
 	{
-	    verletInt1(k, dt, x, v, a);
-	    box_reflect(k, x, v, a);
-	    compute_forces_naive(i, k, x, F);
-	    verletInt2(k, dt, x, v, a);
+	    if(i!=k)
+	    {
+		verletInt1(k, dt, x, v, a);
+		box_reflect(k, x, v, a);
+		compute_forces_naive(i, k, x, F);
+		verletInt2(k, dt, x, v, a);
 
+	    }
 	}
+	memset((F+2*i),0,2*sizeof(float));
+	__syncthreads();
     }
-    memset(F,0,2*particles*sizeof(float));
-    __syncthreads();
 }
 
 
